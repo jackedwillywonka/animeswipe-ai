@@ -1,0 +1,34 @@
+{
+  "expo": {
+    "name": "AnimeSwipe AI",
+    "slug": "animeswipe-ai",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "dark",
+    "backgroundColor": "#0B0B10",
+    "splash": {
+      "image": "./assets/icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#0B0B10"
+    },
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.swolies.animeswipeai"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/icon.png",
+        "backgroundColor": "#0B0B10"
+      },
+      "package": "com.swolies.animeswipeai"
+    },
+    "plugins": [
+      "expo-splash-screen",
+      "expo-font"
+    ]
+  }
+}
