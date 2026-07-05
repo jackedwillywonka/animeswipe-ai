@@ -10,7 +10,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { colors, radius, spacing, typography } from '@/theme/tokens';
-import { getMockSimilarAnime } from '@/data/mockAnime';
+import { getSimilarAnime as getMockSimilarAnime } from '@/services/animeRepository';
 import { explainRecommendation } from '@/services/aiService';
 import type { Anime, MatchResult, UserPreferences } from '@/types';
 
@@ -113,9 +113,9 @@ export function AnimeDetailsScreen({
           {anime.streaming && anime.streaming.length > 0 && (
             <Section title="Watch it on">
               <View style={styles.streamingRow}>
-                {anime.streaming.map((link) => (
+                {anime.streaming.filter((link, i, arr) => arr.findIndex((l) => l.platform === link.platform) === i).map((link) => (
                   <Pressable
-                    key={link.platform}
+                    key={`${link.platform}-${link.url}`}
                     style={styles.streamingButton}
                     onPress={() => Linking.openURL(link.url)}
                   >

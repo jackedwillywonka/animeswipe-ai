@@ -5,7 +5,7 @@ import {
   removeSavedAnime,
   saveAnime,
 } from '@/services/animeRepository';
-import { getMockAnimeById } from '@/data/mockAnime';
+import { getAnimeById as getMockAnimeById } from '@/services/animeRepository';
 import type { Swipe, UserPreferences, UserStats, WatchStatus } from '@/types';
 
 const CURRENT_USER_ID = 'current-user';

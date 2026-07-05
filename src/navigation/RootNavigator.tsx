@@ -8,7 +8,7 @@ import { FilterScreen } from '@/screens/FilterScreen';
 import { MainTabs } from './MainTabs';
 import { colors } from '@/theme/tokens';
 import { useAppContext } from '@/state/AppContext';
-import { getMockAnimeById } from '@/data/mockAnime';
+import { getAnimeById as getMockAnimeById } from '@/services/animeRepository';
 import { scoreAnime, buildInitialWeights } from '@/services/recommendationEngine';
 import type { UserPreferences } from '@/types';
 

@@ -3,7 +3,7 @@ import { FlatList, Image, Pressable, StyleSheet, Text, View } from 'react-native
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { colors, radius, spacing, typography } from '@/theme/tokens';
 import { fetchSavedList } from '@/services/animeRepository';
-import { getMockAnimeById } from '@/data/mockAnime';
+import { getAnimeById as getMockAnimeById } from '@/services/animeRepository';
 import type { Anime, SavedAnime, WatchStatus } from '@/types';
 
 const TABS: { key: WatchStatus; label: string }[] = [

@@ -10,32 +10,36 @@ export interface Anime {
   episodes: number;
   studio: string;
   trailerUrl?: string;
+  trailerYouTubeId?: string;
   posterUrl: string;
-  rating: number; // 0-10 from metadata source
+  rating: number; // 0-10
   releaseYear: number;
   status: 'airing' | 'finished';
+  rawStatus?: string; // FINISHED | RELEASING | NOT_YET_RELEASED | HIATUS | CANCELLED
+  format?: string; // TV | MOVIE | OVA | ONA | SPECIAL
   runtimeMinutes: number;
   ageRating?: string;
   streaming?: StreamingLink[];
+  nextAiring?: { episode: number; airingAt: string };
 }
 
 export interface StreamingLink {
-  platform: 'Crunchyroll' | 'Netflix' | 'Hulu' | 'Funimation' | string;
+  platform: string;
   url: string;
 }
 
 export interface MatchResult {
   animeId: string;
   matchPercent: number; // 0-100
-  reasons: string[]; // e.g. ["Action", "Dark Fantasy", "OP Main Character"]
-  aiExplanation?: string; // full natural-language "why we recommended this"
+  reasons: string[];
+  aiExplanation?: string;
 }
 
 export interface Swipe {
   userId: string;
   animeId: string;
   direction: SwipeDirection;
-  timestamp: string; // ISO 8601
+  timestamp: string;
 }
 
 export interface SavedAnime {
@@ -47,7 +51,7 @@ export interface SavedAnime {
 
 export interface UserPreferences {
   favoriteGenres: string[];
-  likedAnime: string[]; // anime ids
+  likedAnime: string[];
   dislikedGenres: string[];
   dubOrSub: 'dub' | 'sub' | 'either';
   moviesOrSeries: 'movies' | 'series' | 'either';
