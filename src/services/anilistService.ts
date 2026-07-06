@@ -87,7 +87,7 @@ function mapMedia(m: any): Anime {
     genres: m.genres ?? [],
     episodes: m.episodes ?? 0,
     studio: m.studios?.nodes?.[0]?.name ?? 'Unknown studio',
-    posterUrl: m.coverImage?.large || m.coverImage?.extraLarge || '',
+    posterUrl: m.coverImage?.extraLarge || m.coverImage?.large || '',
     rating: m.averageScore ? Math.round(m.averageScore) / 10 : 0,
     releaseYear: m.seasonYear ?? 0,
     status: m.status === 'RELEASING' ? 'airing' : 'finished',

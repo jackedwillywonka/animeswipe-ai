@@ -71,7 +71,7 @@ export function AnimeDetailsScreen({
           <View style={styles.metaRow}>
             <Text style={styles.metaText}>★ {anime.rating.toFixed(1)}</Text>
             <Text style={styles.metaDot}>·</Text>
-            <Text style={styles.metaText}>{anime.episodes} eps</Text>
+            <Text style={styles.metaText}>{anime.episodes} eps{anime.format === 'TV' ? ' (this season)' : ''}</Text>
             <Text style={styles.metaDot}>·</Text>
             <Text style={styles.metaText}>{anime.runtimeMinutes} min</Text>
             <Text style={styles.metaDot}>·</Text>
