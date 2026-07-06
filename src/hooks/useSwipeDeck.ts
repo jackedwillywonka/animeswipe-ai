@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { Anime, MatchResult, Swipe, UserPreferences } from '@/types';
 import { fetchAnimeBatch, recordSwipe } from '@/services/animeRepository';
 import {
@@ -21,15 +21,30 @@ interface UseSwipeDeckResult {
 export function useSwipeDeck(
   userId: string,
   preferences: UserPreferences,
-  onSwipeRecorded?: (swipe: Swipe) => void
+  onSwipeRecorded?: (swipe: Swipe) => void,
+  aiDeck?: Anime[] | null
 ): UseSwipeDeckResult {
   const [deck, setDeck] = useState<Anime[]>([]);
   const [weights, setWeights] = useState<GenreWeights>(() => buildInitialWeights(preferences));
   const [seenIds, setSeenIds] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const lastAiDeckRef = useRef<Anime[] | null>(null);
+
+  // When the AI hands us a new deck, it replaces whatever we're showing.
+  useEffect(() => {
+    if (aiDeck && aiDeck !== lastAiDeckRef.current) {
+      lastAiDeckRef.current = aiDeck;
+      setDeck(aiDeck.filter((a) => !seenIds.includes(a.id)));
+      setIsLoading(false);
+      setError(null);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [aiDeck]);
 
   const loadMore = useCallback(async () => {
+    // Don't auto-refill an AI deck - the user refines via chat instead.
+    if (lastAiDeckRef.current) return;
     try {
       setIsLoading(true);
       const batch = await fetchAnimeBatch(seenIds, 20);
@@ -44,8 +59,8 @@ export function useSwipeDeck(
   }, [seenIds, weights]);
 
   useEffect(() => {
-    loadMore();
-    // Only run on mount; refills are triggered explicitly by swipe().
+    if (!aiDeck) loadMore();
+    else setIsLoading(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -61,7 +76,6 @@ export function useSwipeDeck(
         timestamp: new Date().toISOString(),
       };
 
-      // Optimistic UI: advance the deck immediately, sync in background.
       setDeck((prev) => prev.slice(1));
       setSeenIds((prev) => [...prev, current.id]);
       setWeights((prev) => updateWeightsFromSwipe(prev, current, direction));
@@ -70,8 +84,6 @@ export function useSwipeDeck(
       try {
         await recordSwipe(swipeRecord);
       } catch (e) {
-        // Non-fatal: swipe already reflected in UI. Log for now;
-        // Phase 2 should queue failed writes for retry.
         console.warn('[useSwipeDeck] failed to persist swipe', e);
       }
     },
@@ -79,13 +91,16 @@ export function useSwipeDeck(
   );
 
   useEffect(() => {
-    if (deck.length <= 3 && !isLoading) {
+    if (deck.length <= 3 && !isLoading && !lastAiDeckRef.current) {
       loadMore();
     }
   }, [deck.length, isLoading, loadMore]);
 
   const currentAnime = deck[0];
-  const currentMatch = currentAnime ? scoreAnime(currentAnime, weights) : undefined;
+  const currentMatch = useMemo(
+    () => (currentAnime ? scoreAnime(currentAnime, weights) : undefined),
+    [currentAnime, weights]
+  );
 
   return { deck, currentAnime, currentMatch, isLoading, error, swipe };
 }

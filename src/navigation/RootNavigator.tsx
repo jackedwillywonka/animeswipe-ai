@@ -2,19 +2,22 @@ import React from 'react';
 import { NavigationContainer, DarkTheme } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { LoginScreen } from '@/screens/LoginScreen';
-import { OnboardingScreen } from '@/screens/OnboardingScreen';
+import { WelcomeScreen } from '@/screens/WelcomeScreen';
+import { AIChatScreen } from '@/screens/AIChatScreen';
 import { AnimeDetailsScreen } from '@/screens/AnimeDetailsScreen';
 import { FilterScreen } from '@/screens/FilterScreen';
 import { MainTabs } from './MainTabs';
 import { colors } from '@/theme/tokens';
 import { useAppContext } from '@/state/AppContext';
-import { getAnimeById as getMockAnimeById } from '@/services/animeRepository';
+import { useAiSession } from '@/state/AiSessionContext';
+import { getAnimeById } from '@/services/animeRepository';
 import { scoreAnime, buildInitialWeights } from '@/services/recommendationEngine';
-import type { UserPreferences } from '@/types';
+import { explainFromMemory } from '@/services/aiConversation';
 
 export type RootStackParamList = {
   Login: undefined;
-  Onboarding: undefined;
+  Welcome: undefined;
+  AIChat: undefined;
   Main: undefined;
   Details: { animeId: string };
   Filters: undefined;
@@ -35,22 +38,19 @@ const navTheme = {
 
 interface RootNavigatorProps {
   isAuthenticated: boolean;
-  hasCompletedOnboarding: boolean;
   onLoginGoogle: () => void;
   onLoginApple: () => void;
   onLoginEmail: () => void;
-  onOnboardingComplete: (preferences: UserPreferences) => void;
 }
 
 export function RootNavigator({
   isAuthenticated,
-  hasCompletedOnboarding,
   onLoginGoogle,
   onLoginApple,
   onLoginEmail,
-  onOnboardingComplete,
 }: RootNavigatorProps) {
   const { preferences, savedAnimeIds, toggleSaved } = useAppContext();
+  const { memory, setAiDeck } = useAiSession();
 
   return (
     <NavigationContainer theme={navTheme}>
@@ -65,22 +65,38 @@ export function RootNavigator({
               />
             )}
           </Stack.Screen>
-        ) : !hasCompletedOnboarding ? (
-          <Stack.Screen name="Onboarding">
-            {() => <OnboardingScreen onComplete={onOnboardingComplete} />}
-          </Stack.Screen>
         ) : (
           <>
+            <Stack.Screen name="Welcome">
+              {({ navigation }) => (
+                <WelcomeScreen
+                  onChooseAI={() => navigation.navigate('AIChat')}
+                  onChooseBrowse={() => navigation.navigate('Main')}
+                />
+              )}
+            </Stack.Screen>
+            <Stack.Screen name="AIChat">
+              {({ navigation }) => (
+                <AIChatScreen
+                  memory={memory}
+                  onDeckReady={(deck) => {
+                    setAiDeck(deck);
+                    navigation.navigate('Main');
+                  }}
+                />
+              )}
+            </Stack.Screen>
             <Stack.Screen name="Main" component={MainTabs} />
             <Stack.Screen
               name="Details"
               options={{ presentation: 'card', animation: 'slide_from_right' }}
             >
               {({ navigation, route }) => {
-                const anime = getMockAnimeById(route.params.animeId);
+                const anime = getAnimeById(route.params.animeId);
                 if (!anime) return null;
                 const weights = buildInitialWeights(preferences);
                 const match = scoreAnime(anime, weights);
+                match.aiExplanation = explainFromMemory(memory, anime);
                 return (
                   <AnimeDetailsScreen
                     anime={anime}

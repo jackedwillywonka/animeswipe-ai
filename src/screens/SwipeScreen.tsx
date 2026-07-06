@@ -1,13 +1,15 @@
-import React from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
+import React, { useState } from 'react';
+import { ActivityIndicator, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { SwipeCard } from '@/components/SwipeCard';
 import { SwipeActionButtons } from '@/components/SwipeActionButtons';
-import { colors, spacing, typography } from '@/theme/tokens';
+import { AIChatScreen } from '@/screens/AIChatScreen';
+import { colors, radius, spacing, typography } from '@/theme/tokens';
 import { useSwipeDeck } from '@/hooks/useSwipeDeck';
 import { useAppContext } from '@/state/AppContext';
+import { useAiSession } from '@/state/AiSessionContext';
 import type { RootStackParamList } from '@/navigation/RootNavigator';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
@@ -15,18 +17,24 @@ type Nav = NativeStackNavigationProp<RootStackParamList>;
 export function SwipeScreen() {
   const navigation = useNavigation<Nav>();
   const { userId, preferences, recordLocalSwipe } = useAppContext();
+  const { memory, aiDeck, setAiDeck } = useAiSession();
+  const [chatOpen, setChatOpen] = useState(false);
+
   const { deck, currentAnime, currentMatch, isLoading, error, swipe } = useSwipeDeck(
     userId,
     preferences,
-    recordLocalSwipe
+    recordLocalSwipe,
+    aiDeck
   );
 
-  const upcoming = deck.slice(1, 3); // render 2 cards behind the top card
+  const upcoming = deck.slice(1, 2);
 
   function openDetails() {
     if (!currentAnime) return;
     navigation.navigate('Details', { animeId: currentAnime.id });
   }
+
+  const usingAiDeck = aiDeck !== null && aiDeck.length > 0;
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
@@ -40,7 +48,13 @@ export function SwipeScreen() {
         </Pressable>
       </View>
 
-      <Pressable style={styles.deckArea} onPress={openDetails} disabled={!currentAnime}>
+      {usingAiDeck && (
+        <View style={styles.aiDeckBadge}>
+          <Text style={styles.aiDeckBadgeText}>✨ AI-curated deck · {deck.length} left</Text>
+        </View>
+      )}
+
+      <View style={styles.deckArea}>
         {error && <Text style={styles.errorText}>{error}</Text>}
 
         {!error && isLoading && deck.length === 0 && (
@@ -48,7 +62,11 @@ export function SwipeScreen() {
         )}
 
         {!error && !isLoading && deck.length === 0 && (
-          <Text style={styles.emptyText}>You're all caught up! Check back soon for more.</Text>
+          <View style={styles.emptyState}>
+            <Text style={styles.emptyText}>
+              You made it through the whole deck! Tap the AI below for a fresh batch.
+            </Text>
+          </View>
         )}
 
         {upcoming
@@ -64,12 +82,11 @@ export function SwipeScreen() {
             anime={currentAnime}
             match={currentMatch}
             onSwiped={swipe}
+            onTap={openDetails}
             isTopCard
           />
         )}
-      </Pressable>
-
-      <Text style={styles.hint}>Tap the card for details · swipe to decide</Text>
+      </View>
 
       <View style={styles.actionsArea}>
         <SwipeActionButtons
@@ -78,6 +95,27 @@ export function SwipeScreen() {
           onLike={() => swipe('right')}
         />
       </View>
+
+      <Pressable style={styles.aiTab} onPress={() => setChatOpen(true)}>
+        <Text style={styles.aiTabText}>✨ Ask the AI · refine your deck</Text>
+      </Pressable>
+
+      <Modal
+        visible={chatOpen}
+        animationType="slide"
+        presentationStyle="pageSheet"
+        onRequestClose={() => setChatOpen(false)}
+      >
+        <AIChatScreen
+          isSheet
+          memory={memory}
+          onClose={() => setChatOpen(false)}
+          onDeckReady={(newDeck) => {
+            setAiDeck(newDeck);
+            setChatOpen(false);
+          }}
+        />
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -92,7 +130,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
+    paddingVertical: spacing.sm,
   },
   wordmark: {
     ...typography.display,
@@ -109,20 +147,36 @@ const styles = StyleSheet.create({
     fontSize: 20,
     color: colors.textSecondary,
   },
+  aiDeckBadge: {
+    alignSelf: 'center',
+    backgroundColor: colors.violetDeep,
+    borderRadius: radius.pill,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs,
+    marginBottom: spacing.xs,
+  },
+  aiDeckBadgeText: {
+    ...typography.bodyMedium,
+    color: colors.violetLight,
+    fontSize: 12,
+  },
   deckArea: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
   },
   actionsArea: {
-    paddingBottom: spacing.xl,
+    paddingBottom: spacing.sm,
   },
-  hint: {
+  emptyState: {
+    paddingHorizontal: spacing.xl,
+  },
+  emptyText: {
     ...typography.body,
-    color: colors.textTertiary,
-    fontSize: 12,
+    color: colors.textSecondary,
     textAlign: 'center',
-    marginBottom: spacing.sm,
+    fontSize: 15,
+    lineHeight: 22,
   },
   errorText: {
     ...typography.body,
@@ -130,10 +184,20 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     paddingHorizontal: spacing.xl,
   },
-  emptyText: {
-    ...typography.body,
-    color: colors.textSecondary,
-    textAlign: 'center',
-    paddingHorizontal: spacing.xl,
+  aiTab: {
+    marginHorizontal: spacing.lg,
+    marginBottom: spacing.sm,
+    height: 46,
+    borderRadius: radius.pill,
+    backgroundColor: colors.violetDeep,
+    borderWidth: 1,
+    borderColor: colors.violetCore,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  aiTabText: {
+    ...typography.bodyMedium,
+    color: colors.violetLight,
+    fontSize: 14,
   },
 });

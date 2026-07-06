@@ -25,6 +25,7 @@ const MEDIA_FIELDS = `
   studios(isMain: true) { nodes { name } }
   externalLinks { site url type }
   nextAiringEpisode { airingAt episode }
+  relations { edges { relationType node { id type } } }
 `;
 
 const animeCache = new Map<string, Anime>();
@@ -71,6 +72,13 @@ function mapStreaming(links: any[] | null | undefined): StreamingLink[] {
     .map((l) => ({ platform: l.site, url: l.url }));
 }
 
+function isSequel(m: any): boolean {
+  const edges = m?.relations?.edges ?? [];
+  return edges.some(
+    (e: any) => e?.relationType === 'PREQUEL' && e?.node?.type === 'ANIME'
+  );
+}
+
 function mapMedia(m: any): Anime {
   const anime: Anime = {
     id: String(m.id),
@@ -79,7 +87,7 @@ function mapMedia(m: any): Anime {
     genres: m.genres ?? [],
     episodes: m.episodes ?? 0,
     studio: m.studios?.nodes?.[0]?.name ?? 'Unknown studio',
-    posterUrl: m.coverImage?.extraLarge || m.coverImage?.large || '',
+    posterUrl: m.coverImage?.large || m.coverImage?.extraLarge || '',
     rating: m.averageScore ? Math.round(m.averageScore) / 10 : 0,
     releaseYear: m.seasonYear ?? 0,
     status: m.status === 'RELEASING' ? 'airing' : 'finished',
@@ -121,7 +129,7 @@ export async function fetchPopularAnime(
     perPage,
     idNotIn: idNotIn.length ? idNotIn : undefined,
   });
-  return (data?.Page?.media ?? []).filter((m: any) => !m.isAdult).map(mapMedia);
+  return (data?.Page?.media ?? []).filter((m: any) => !m.isAdult && !isSequel(m)).map(mapMedia);
 }
 
 export async function searchAnimeByText(search: string, perPage = 25): Promise<Anime[]> {
@@ -160,7 +168,7 @@ export async function fetchAnimeByGenres(
     perPage,
     idNotIn: idNotIn.length ? idNotIn : undefined,
   });
-  return (data?.Page?.media ?? []).filter((m: any) => !m.isAdult).map(mapMedia);
+  return (data?.Page?.media ?? []).filter((m: any) => !m.isAdult && !isSequel(m)).map(mapMedia);
 }
 
 export function getCachedAnimeById(id: string): Anime | undefined {

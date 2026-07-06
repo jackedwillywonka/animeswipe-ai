@@ -20,10 +20,20 @@ interface SwipeCardProps {
   anime: Anime;
   match?: MatchResult;
   onSwiped: (direction: SwipeDirection) => void;
+  onTap?: () => void;
   isTopCard: boolean;
 }
 
-export function SwipeCard({ anime, match, onSwiped, isTopCard }: SwipeCardProps) {
+export function SwipeCard({ anime, match, onSwiped, onTap, isTopCard }: SwipeCardProps) {
+  // Static back card: no gestures, no animations, no gradient - just poster + title.
+  if (!isTopCard) {
+    return (
+      <View style={[styles.card, styles.backCard]}>
+        <Image source={{ uri: anime.posterUrl }} style={styles.poster} resizeMode="cover" />
+      </View>
+    );
+  }
+
   const translateX = useSharedValue(0);
   const translateY = useSharedValue(0);
 
@@ -34,8 +44,16 @@ export function SwipeCard({ anime, match, onSwiped, isTopCard }: SwipeCardProps)
     translateY.value = 0;
   };
 
+  const tap = Gesture.Tap()
+    .enabled(isTopCard && !!onTap)
+    .maxDistance(12)
+    .onEnd((_e, success) => {
+      if (success && onTap) runOnJS(onTap)();
+    });
+
   const pan = Gesture.Pan()
     .enabled(isTopCard)
+    .activeOffsetX([-8, 8])
     .onUpdate((e) => {
       translateX.value = e.translationX;
       translateY.value = e.translationY * 0.5;
@@ -77,8 +95,10 @@ export function SwipeCard({ anime, match, onSwiped, isTopCard }: SwipeCardProps)
     opacity: interpolate(translateX.value, [-SWIPE_THRESHOLD, 0], [1, 0]),
   }));
 
+  const composedGesture = onTap ? Gesture.Race(pan, tap) : pan;
+
   return (
-    <GestureDetector gesture={pan}>
+    <GestureDetector gesture={composedGesture}>
       <Animated.View style={[styles.card, shadows.card, cardStyle]}>
         <Image source={{ uri: anime.posterUrl }} style={styles.poster} resizeMode="cover" />
         <LinearGradient colors={gradients.screenFade} style={styles.fade} />
@@ -123,6 +143,10 @@ const CARD_WIDTH = SCREEN_WIDTH * 0.9;
 const CARD_HEIGHT = CARD_WIDTH * 1.45;
 
 const styles = StyleSheet.create({
+  backCard: {
+    transform: [{ scale: 0.96 }],
+    opacity: 0.7,
+  },
   card: {
     position: 'absolute',
     width: CARD_WIDTH,
