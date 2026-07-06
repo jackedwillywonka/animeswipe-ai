@@ -2,7 +2,8 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { FlatList, Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { colors, radius, spacing, typography } from '@/theme/tokens';
-import { fetchSavedList } from '@/services/animeRepository';
+import { fetchSavedList, getAnimeByIdAsync } from '@/services/animeRepository';
+import { useAppContext } from '@/state/AppContext';
 import { getAnimeById as getMockAnimeById } from '@/services/animeRepository';
 import type { Anime, SavedAnime, WatchStatus } from '@/types';
 
@@ -19,25 +20,35 @@ interface SavedListScreenProps {
   onSelectAnime: (anime: Anime) => void;
 }
 
-export function SavedListScreen({ userId, onSelectAnime }: SavedListScreenProps) {
+export function SavedListScreen({ onSelectAnime }: SavedListScreenProps) {
+  const { userId, savedAnimeIds } = useAppContext();
   const [activeTab, setActiveTab] = useState<WatchStatus>('plan_to_watch');
   const [savedItems, setSavedItems] = useState<SavedAnime[]>([]);
+  const [resolvedAnime, setResolvedAnime] = useState<Anime[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
+    if (!userId) return;
     fetchSavedList(userId)
       .then(setSavedItems)
       .finally(() => setIsLoading(false));
-  }, [userId]);
+  }, [userId, savedAnimeIds]);
 
-  const itemsForTab = useMemo(
-    () =>
-      savedItems
-        .filter((s) => s.status === activeTab)
-        .map((s) => getMockAnimeById(s.animeId))
-        .filter((a): a is Anime => Boolean(a)),
-    [savedItems, activeTab]
-  );
+  useEffect(() => {
+    let cancelled = false;
+    const forTab = savedItems.filter((sv) => sv.status === activeTab);
+    (async () => {
+      const results = await Promise.all(
+        forTab.map((sv) => getAnimeByIdAsync(sv.animeId))
+      );
+      if (!cancelled) {
+        setResolvedAnime(results.filter((a): a is Anime => Boolean(a)));
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [savedItems, activeTab]);
+
+  const itemsForTab = resolvedAnime;
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>

@@ -16,7 +16,7 @@ type Nav = NativeStackNavigationProp<RootStackParamList>;
 
 export function SwipeScreen() {
   const navigation = useNavigation<Nav>();
-  const { userId, preferences, recordLocalSwipe } = useAppContext();
+  const { userId, preferences, recordLocalSwipe, toggleSaved, savedAnimeIds } = useAppContext();
   const { memory, aiDeck, setAiDeck } = useAiSession();
   const [chatOpen, setChatOpen] = useState(false);
 
@@ -28,6 +28,17 @@ export function SwipeScreen() {
   );
 
   const upcoming = deck.slice(1, 2);
+
+  const handleDecision = React.useCallback(
+    (direction: 'left' | 'right') => {
+      const current = deck[0];
+      if (current && direction === 'right' && !savedAnimeIds.has(current.id)) {
+        toggleSaved(current.id, 'plan_to_watch');
+      }
+      swipe(direction);
+    },
+    [deck, savedAnimeIds, toggleSaved, swipe]
+  );
 
   function openDetails() {
     if (!currentAnime) return;
@@ -81,7 +92,7 @@ export function SwipeScreen() {
             key={currentAnime.id}
             anime={currentAnime}
             match={currentMatch}
-            onSwiped={swipe}
+            onSwiped={(dir) => handleDecision(dir)}
             onTap={openDetails}
             isTopCard
           />
@@ -91,8 +102,8 @@ export function SwipeScreen() {
       <View style={styles.actionsArea}>
         <SwipeActionButtons
           disabled={!currentAnime}
-          onPass={() => swipe('left')}
-          onLike={() => swipe('right')}
+          onPass={() => handleDecision('left')}
+          onLike={() => handleDecision('right')}
         />
       </View>
 

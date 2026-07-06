@@ -186,3 +186,22 @@ export function getSimilarFromCache(anime: Anime, limit = 6): Anime[] {
   }
   return results;
 }
+
+
+export async function fetchAnimeById(id: string): Promise<Anime | null> {
+  const query = `
+    query ($id: Int) {
+      Media(id: $id, type: ANIME) {
+        ${MEDIA_FIELDS}
+      }
+    }
+  `;
+  const numId = Number(id);
+  if (Number.isNaN(numId)) return null;
+  try {
+    const data = await gqlRequest<any>(query, { id: numId });
+    return data?.Media ? mapMedia(data.Media) : null;
+  } catch {
+    return null;
+  }
+}

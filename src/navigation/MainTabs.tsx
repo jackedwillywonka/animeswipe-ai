@@ -13,7 +13,6 @@ import type { RootStackParamList } from './RootNavigator';
 
 export type MainTabParamList = {
   Swipe: undefined;
-  Search: undefined;
   Saved: undefined;
   Profile: undefined;
 };
@@ -42,7 +41,6 @@ export function MainTabs() {
         tabBarIcon: ({ color, size }) => {
           const iconName: Record<keyof MainTabParamList, keyof typeof Ionicons.glyphMap> = {
             Swipe: 'flame',
-            Search: 'sparkles',
             Saved: 'bookmark',
             Profile: 'person-circle',
           };
@@ -51,17 +49,9 @@ export function MainTabs() {
       })}
     >
       <Tab.Screen name="Swipe" component={SwipeScreen} />
-      <Tab.Screen name="Search">
-        {() => (
-          <AISearchScreen
-            onSelectAnime={(anime) => navigation.navigate('Details', { animeId: anime.id })}
-          />
-        )}
-      </Tab.Screen>
       <Tab.Screen name="Saved">
         {() => (
           <SavedListScreen
-            userId={userId}
             onSelectAnime={(anime) => navigation.navigate('Details', { animeId: anime.id })}
           />
         )}

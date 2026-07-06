@@ -5,10 +5,11 @@ import {
   removeSavedAnime,
   saveAnime,
 } from '@/services/animeRepository';
+import { getDeviceUserId } from '@/services/deviceUser';
 import { getAnimeById as getMockAnimeById } from '@/services/animeRepository';
 import type { Swipe, UserPreferences, UserStats, WatchStatus } from '@/types';
 
-const CURRENT_USER_ID = 'current-user';
+// user id now comes from the device (persists across launches)
 
 interface AppContextValue {
   userId: string;
@@ -32,19 +33,26 @@ const DEFAULT_PREFERENCES: UserPreferences = {
 const AppContext = createContext<AppContextValue | null>(null);
 
 export function AppProvider({ children }: { children: React.ReactNode }) {
+  const [userId, setUserId] = useState<string>('');
   const [preferences, setPreferences] = useState<UserPreferences>(DEFAULT_PREFERENCES);
   const [savedAnimeIds, setSavedAnimeIds] = useState<Set<string>>(new Set());
   const [swipeHistory, setSwipeHistory] = useState<Swipe[]>([]);
 
   useEffect(() => {
-    fetchSavedList(CURRENT_USER_ID).then((items) => {
+    (async () => {
+      const id = await getDeviceUserId();
+      setUserId(id);
+      const items = await fetchSavedList(id);
       setSavedAnimeIds(new Set(items.map((i) => i.animeId)));
-    });
-    fetchSwipeHistory(CURRENT_USER_ID).then(setSwipeHistory);
+      const history = await fetchSwipeHistory(id);
+      setSwipeHistory(history);
+    })();
   }, []);
 
   const toggleSaved = useCallback(
     async (animeId: string, status: WatchStatus = 'plan_to_watch') => {
+      console.warn('[SAVE] userId=', userId || 'EMPTY');
+      if (!userId) return;
       const isSaved = savedAnimeIds.has(animeId);
       // Optimistic update
       setSavedAnimeIds((prev) => {
@@ -54,12 +62,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         return next;
       });
       if (isSaved) {
-        await removeSavedAnime(CURRENT_USER_ID, animeId);
+        await removeSavedAnime(userId, animeId);
       } else {
-        await saveAnime(CURRENT_USER_ID, animeId, status);
+        await saveAnime(userId, animeId, status);
       }
     },
-    [savedAnimeIds]
+    [savedAnimeIds, userId]
   );
 
   const recordLocalSwipe = useCallback((swipe: Swipe) => {
@@ -103,7 +111,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   }, [swipeHistory]);
 
   const value: AppContextValue = {
-    userId: CURRENT_USER_ID,
+    userId,
     preferences,
     setPreferences,
     savedAnimeIds,

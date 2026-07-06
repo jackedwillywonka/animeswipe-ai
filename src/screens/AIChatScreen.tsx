@@ -90,8 +90,8 @@ export function AIChatScreen({ memory, onDeckReady, onClose, isSheet }: AIChatSc
 
       <KeyboardAvoidingView
         style={styles.flex}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        keyboardVerticalOffset={isSheet ? 0 : 0}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={isSheet ? 8 : 40}
       >
         <FlatList
           ref={listRef}
