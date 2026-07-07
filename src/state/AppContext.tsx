@@ -24,6 +24,7 @@ interface AppContextValue {
   savedAnimeIds: Set<string>;
   favoriteIds: Set<string>;
   statusById: Record<string, string>;
+  statusChangedAt: Record<string, string>;
   setStatus: (animeId: string, status: WatchStatus) => Promise<void>;
   toggleFavorite: (animeId: string) => Promise<void>;
   restoreDroppedAnime: () => Promise<string[]>;
@@ -49,11 +50,14 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [savedAnimeIds, setSavedAnimeIds] = useState<Set<string>>(new Set());
   const [favoriteIds, setFavoriteIds] = useState<Set<string>>(new Set());
   const [statusById, setStatusById] = useState<Record<string, string>>({});
+  const [statusChangedAt, setStatusChangedAt] = useState<Record<string, string>>({});
   const [swipeHistory, setSwipeHistory] = useState<Swipe[]>([]);
 
   useEffect(() => {
     (async () => {
+      console.warn('[AppContext] loading disk cache...');
       await loadCacheFromDisk();
+      console.warn('[AppContext] disk cache loaded');
       const id = await getDeviceUserId();
       setUserId(id);
       const items = await fetchSavedList(id);
@@ -134,6 +138,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       if (!userId) return;
       setSavedAnimeIds((prev) => new Set(prev).add(animeId));
       setStatusById((prev) => ({ ...prev, [animeId]: status }));
+      setStatusChangedAt((prev) => ({ ...prev, [animeId]: new Date().toISOString() }));
       await setWatchStatus(userId, animeId, status);
     },
     [userId]
@@ -163,6 +168,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       ids.forEach((id) => next.delete(id));
       return next;
     });
+    setStatusById((prev) => {
+      const next = { ...prev };
+      ids.forEach((id) => { delete next[id]; });
+      return next;
+    });
     return ids;
   }, [userId]);
 
@@ -173,6 +183,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     savedAnimeIds,
     favoriteIds,
     statusById,
+    statusChangedAt,
     setStatus,
     toggleFavorite,
     restoreDroppedAnime,

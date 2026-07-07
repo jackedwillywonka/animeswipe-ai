@@ -23,7 +23,7 @@ interface ResolvedItem {
 }
 
 export function SavedListScreen({ onSelectAnime }: SavedListScreenProps) {
-  const { userId, savedAnimeIds, favoriteIds, restoreDroppedAnime } = useAppContext();
+  const { userId, savedAnimeIds, favoriteIds, statusById, statusChangedAt, restoreDroppedAnime } = useAppContext();
   const [restoreMsg, setRestoreMsg] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<WatchStatus>('plan_to_watch');
   const [savedItems, setSavedItems] = useState<SavedAnime[]>([]);
@@ -38,10 +38,27 @@ export function SavedListScreen({ onSelectAnime }: SavedListScreenProps) {
       .finally(() => setIsLoading(false));
   }, [userId, savedAnimeIds, favoriteIds]);
 
-  // Resolve anime details for the active tab, sorted newest-first
+  // Resolve anime details for the active tab, sorted newest-first.
+  // statusById (in-memory, updated instantly on button tap) is the source of
+  // truth for WHICH section an anime is in; the Supabase fetch supplies savedAt.
   useEffect(() => {
     let cancelled = false;
-    const forTab = savedItems
+    const fetchedById = new Map(savedItems.map((sv) => [sv.animeId, sv]));
+    const allIds = new Set<string>([
+      ...savedItems.map((sv) => sv.animeId),
+      ...Object.keys(statusById),
+    ]);
+    const merged = Array.from(allIds).map((animeId) => ({
+      animeId,
+      status: statusById[animeId] ?? fetchedById.get(animeId)?.status ?? '',
+      // In-memory change time wins over the (possibly stale) fetched one,
+      // so a just-moved anime always sorts to the top of its new section.
+      savedAt:
+        statusChangedAt[animeId] ??
+        fetchedById.get(animeId)?.savedAt ??
+        new Date().toISOString(),
+    }));
+    const forTab = merged
       .filter((sv) => sv.status === activeTab)
       .sort((a, b) => (b.savedAt || '').localeCompare(a.savedAt || '')); // newest first
     (async () => {
@@ -58,7 +75,7 @@ export function SavedListScreen({ onSelectAnime }: SavedListScreenProps) {
     return () => {
       cancelled = true;
     };
-  }, [savedItems, activeTab]);
+  }, [savedItems, activeTab, statusById, statusChangedAt]);
 
   async function handleRestore() {
     const ids = await restoreDroppedAnime();

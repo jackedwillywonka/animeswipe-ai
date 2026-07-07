@@ -32,10 +32,21 @@ export function useSwipeDeck(
   const [error, setError] = useState<string | null>(null);
   const lastAiDeckRef = useRef<Anime[] | null>(null);
   const excludeRef = useRef<Set<string>>(new Set(alreadySavedIds ?? []));
+  const pageRef = useRef(1);
+  const emptyPagesRef = useRef(0);
+  const outOfAnimeRef = useRef(false);
+
+  // Keep the exclusion set in sync as the saved list loads/changes.
+  useEffect(() => {
+    if (alreadySavedIds) {
+      alreadySavedIds.forEach((id) => excludeRef.current.add(id));
+    }
+  }, [alreadySavedIds]);
 
   // When the AI hands us a new deck, it replaces whatever we're showing.
   useEffect(() => {
     if (aiDeck && aiDeck !== lastAiDeckRef.current) {
+      console.warn(`[useSwipeDeck] AI deck received: ${aiDeck.length} cards`);
       lastAiDeckRef.current = aiDeck;
       excludeRef.current = new Set(alreadySavedIds ?? []);
       setDeck(aiDeck.filter((a) => !seenIds.includes(a.id) && !excludeRef.current.has(a.id)));
@@ -47,23 +58,49 @@ export function useSwipeDeck(
 
   const loadMore = useCallback(async () => {
     // Don't auto-refill an AI deck - the user refines via chat instead.
-    if (lastAiDeckRef.current) return;
+    if (lastAiDeckRef.current) {
+      console.warn('[useSwipeDeck] loadMore skipped - AI deck active');
+      return;
+    }
+    if (outOfAnimeRef.current) {
+      console.warn('[useSwipeDeck] loadMore skipped - no fresh anime left to fetch');
+      setIsLoading(false);
+      return;
+    }
+    console.warn(`[useSwipeDeck] loadMore starting (page ${pageRef.current})`);
     try {
       setIsLoading(true);
-      const batch = await fetchAnimeBatch(seenIds, 20);
+      // Exclude BOTH swiped-this-session AND everything already in the library,
+      // so AniList returns anime the user hasn't touched.
+      const excludeAll = Array.from(new Set([...seenIds, ...excludeRef.current]));
+      const batch = await fetchAnimeBatch(excludeAll, 20, pageRef.current);
       const filtered = batch.filter((a) => !excludeRef.current.has(a.id) && !seenIds.includes(a.id));
+      console.warn(`[useSwipeDeck] batch ${batch.length}, after filtering ${filtered.length}`);
+      if (filtered.length === 0) {
+        emptyPagesRef.current += 1;
+        pageRef.current += 1;
+        if (emptyPagesRef.current >= 4) {
+          outOfAnimeRef.current = true;
+          console.warn('[useSwipeDeck] 4 empty pages in a row - stopping auto-refill');
+        }
+      } else {
+        emptyPagesRef.current = 0;
+        pageRef.current += 1;
+      }
       setDeck((prev) => [...prev, ...rankByMatch(filtered, weights)]);
       setError(null);
     } catch (e) {
       console.warn('[useSwipeDeck] load failed', e);
       setError(e instanceof Error ? e.message : 'Failed to load anime.');
     } finally {
+      console.warn('[useSwipeDeck] loadMore finished');
       setIsLoading(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [seenIds, weights]);
 
   useEffect(() => {
+    console.warn(`[useSwipeDeck] mount - aiDeck is ${aiDeck ? `array(${aiDeck.length})` : String(aiDeck)}`);
     if (!aiDeck) loadMore();
     else setIsLoading(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps

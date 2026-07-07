@@ -14,14 +14,18 @@ import type { Anime, Swipe, SavedAnime, UserPreferences, WatchStatus } from '@/t
  * - User data (swipes, saved, preferences, chat): persisted to Supabase.
  */
 
-export async function fetchAnimeBatch(excludeIds: string[], limit = 20): Promise<Anime[]> {
+export async function fetchAnimeBatch(excludeIds: string[], limit = 20, page = 1): Promise<Anime[]> {
+  console.warn(`[fetchAnimeBatch] start (excluding ${excludeIds.length} ids, page ${page})`);
   try {
-    const fromApi = await fetchPopularAnime(excludeIds, limit);
+    const fromApi = await fetchPopularAnime(excludeIds, limit, page);
+    console.warn(`[fetchAnimeBatch] AniList returned ${fromApi.length}`);
     if (fromApi.length > 0) return fromApi;
   } catch (e) {
     console.warn('[animeRepository] AniList fetch failed, using local fallback', e);
   }
-  return MOCK_ANIME.filter((a) => !excludeIds.includes(a.id)).slice(0, limit);
+  const mock = MOCK_ANIME.filter((a) => !excludeIds.includes(a.id)).slice(0, limit);
+  console.warn(`[fetchAnimeBatch] falling back to ${mock.length} mock anime`);
+  return mock;
 }
 
 export function getAnimeById(id: string): Anime | undefined {
