@@ -42,6 +42,13 @@ export async function loadCacheFromDisk(): Promise<void> {
       arr.forEach((a) => animeCache.set(a.id, a));
     }
   } catch {}
+  try {
+    const rawFr = await AsyncStorage.getItem(FRANCHISE_CACHE_KEY);
+    if (rawFr) {
+      const obj: Record<string, FranchiseInfo> = JSON.parse(rawFr);
+      Object.entries(obj).forEach(([id, info]) => franchiseCache.set(id, info));
+    }
+  } catch {}
   cacheLoaded = true;
 }
 
@@ -268,6 +275,19 @@ export interface FranchiseInfo {
 }
 
 const franchiseCache = new Map<string, FranchiseInfo>();
+const FRANCHISE_CACHE_KEY = 'franchise_cache_v1';
+
+let franchiseSaveTimer: any = null;
+function persistFranchiseCache() {
+  if (franchiseSaveTimer) clearTimeout(franchiseSaveTimer);
+  franchiseSaveTimer = setTimeout(async () => {
+    try {
+      const obj: Record<string, FranchiseInfo> = {};
+      franchiseCache.forEach((info, id) => { obj[id] = info; });
+      await AsyncStorage.setItem(FRANCHISE_CACHE_KEY, JSON.stringify(obj));
+    } catch {}
+  }, 1000);
+}
 const SEASON_FORMATS = ['TV', 'TV_SHORT', 'ONA'];
 
 const RELATION_QUERY = `
@@ -376,5 +396,6 @@ export async function fetchFranchiseInfo(id: string): Promise<FranchiseInfo | nu
       hasOngoing,
     });
   });
+  persistFranchiseCache();
   return franchiseCache.get(id) ?? null;
 }
