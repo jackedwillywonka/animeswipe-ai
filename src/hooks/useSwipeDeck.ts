@@ -56,7 +56,7 @@ export function useSwipeDeck(
       setError(null);
     } catch (e) {
       console.warn('[useSwipeDeck] load failed', e);
-      setError(null);
+      setError(e instanceof Error ? e.message : 'Failed to load anime.');
     } finally {
       setIsLoading(false);
     }
