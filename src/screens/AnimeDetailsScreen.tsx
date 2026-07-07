@@ -102,6 +102,8 @@ export function AnimeDetailsScreen({
             <Text style={styles.metaText}>
               {anime.episodes > 0
                 ? `${anime.episodes} eps${franchise && franchise.totalSeasons > 1 ? ' (this season)' : ''}`
+                : anime.nextAiring?.episode
+                ? `${anime.nextAiring.episode - 1} eps (so far)`
                 : anime.status === 'airing'
                 ? 'Ongoing'
                 : 'Episodes TBA'}
@@ -115,7 +117,9 @@ export function AnimeDetailsScreen({
           {franchise && (
             <Text style={styles.franchiseText}>
               {franchise.hasOngoing
-                ? `Season ${franchise.seasonNumber} of ${franchise.totalSeasons} · ongoing series`
+                ? franchise.totalEpisodes > 0
+                  ? `Season ${franchise.seasonNumber} of ${franchise.totalSeasons} · ${franchise.totalEpisodes}+ episodes total · ongoing`
+                  : `Season ${franchise.seasonNumber} of ${franchise.totalSeasons} · ongoing series`
                 : `Season ${franchise.seasonNumber} of ${franchise.totalSeasons} · ${franchise.totalEpisodes} episodes total`}
             </Text>
           )}

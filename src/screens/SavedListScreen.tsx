@@ -3,6 +3,11 @@ import { FlatList, Image, Pressable, StyleSheet, Text, View } from 'react-native
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { colors, radius, spacing, typography } from '@/theme/tokens';
 import { fetchSavedList, getAnimeByIdAsync } from '@/services/animeRepository';
+import {
+  fetchFranchiseInfo,
+  getCachedFranchiseInfo,
+  type FranchiseInfo,
+} from '@/services/anilistService';
 import { useAppContext } from '@/state/AppContext';
 import type { Anime, SavedAnime, WatchStatus } from '@/types';
 
@@ -29,6 +34,36 @@ export function SavedListScreen({ onSelectAnime }: SavedListScreenProps) {
   const [savedItems, setSavedItems] = useState<SavedAnime[]>([]);
   const [resolvedItems, setResolvedItems] = useState<ResolvedItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [franchiseById, setFranchiseById] = useState<Record<string, FranchiseInfo>>({});
+
+  // Load franchise info for visible cards: cache first (instant), then fill
+  // gaps one at a time with a delay so we never hammer AniList.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const missing: string[] = [];
+      const fromCache: Record<string, FranchiseInfo> = {};
+      for (const item of resolvedItems) {
+        const cached = getCachedFranchiseInfo(item.anime.id);
+        if (cached) fromCache[item.anime.id] = cached;
+        else missing.push(item.anime.id);
+      }
+      if (Object.keys(fromCache).length > 0 && !cancelled) {
+        setFranchiseById((prev) => ({ ...prev, ...fromCache }));
+      }
+      for (const id of missing) {
+        if (cancelled) return;
+        const info = await fetchFranchiseInfo(id).catch(() => null);
+        if (info && !cancelled) {
+          setFranchiseById((prev) => ({ ...prev, [id]: info }));
+        }
+        await new Promise((r) => setTimeout(r, 400));
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [resolvedItems]);
 
   // Reload the saved list whenever the user's saved set changes or favorites change
   useEffect(() => {
@@ -140,7 +175,19 @@ export function SavedListScreen({ onSelectAnime }: SavedListScreenProps) {
             <Text style={styles.cardTitle} numberOfLines={1}>
               {item.anime.title}
             </Text>
-            <Text style={styles.cardMeta}>{item.anime.episodes} eps</Text>
+            <Text style={styles.cardMeta}>
+              {(() => {
+                const fr = franchiseById[item.anime.id];
+                if (item.anime.episodes > 0) {
+                  if (fr && fr.totalSeasons > 1) return `${item.anime.episodes} eps (this season)`;
+                  if (fr) return `${item.anime.episodes} eps (total)`;
+                  return `${item.anime.episodes} eps`;
+                }
+                if (item.anime.nextAiring?.episode)
+                  return `${item.anime.nextAiring.episode - 1} eps (so far)`;
+                return item.anime.status === 'airing' ? 'Ongoing' : 'Episodes TBA';
+              })()}
+            </Text>
           </Pressable>
         )}
       />

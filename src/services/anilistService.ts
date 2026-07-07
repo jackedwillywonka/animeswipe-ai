@@ -275,6 +275,7 @@ const RELATION_QUERY = `
     Media(id: $id, type: ANIME) {
       id
       episodes
+      nextAiringEpisode { episode }
       relations {
         edges {
           relationType
@@ -288,6 +289,7 @@ const RELATION_QUERY = `
 interface ChainNode {
   id: number;
   episodes: number;
+  isOngoing: boolean;
   prequelId: number | null;
   sequelId: number | null;
 }
@@ -305,15 +307,25 @@ async function fetchChainNode(id: number): Promise<ChainNode | null> {
           e?.node?.type === 'ANIME' &&
           SEASON_FORMATS.includes(e?.node?.format)
       )?.node?.id ?? null;
+    // For an ongoing season AniList has no final episode count, but the
+    // next-airing episode number tells us how many have aired so far.
+    const airedSoFar = m.nextAiringEpisode?.episode
+      ? m.nextAiringEpisode.episode - 1
+      : 0;
     return {
       id: m.id,
-      episodes: m.episodes ?? 0,
+      episodes: m.episodes ?? airedSoFar,
+      isOngoing: m.episodes == null,
       prequelId: findRel('PREQUEL'),
       sequelId: findRel('SEQUEL'),
     };
   } catch {
     return null;
   }
+}
+
+export function getCachedFranchiseInfo(id: string): FranchiseInfo | undefined {
+  return franchiseCache.get(id);
 }
 
 export async function fetchFranchiseInfo(id: string): Promise<FranchiseInfo | null> {
@@ -354,7 +366,7 @@ export async function fetchFranchiseInfo(id: string): Promise<FranchiseInfo | nu
   const totalEpisodes = chain.reduce((sum, c) => sum + (c.episodes || 0), 0);
   // If any season has no episode count, the series is still running and
   // a summed total would be misleading.
-  const hasOngoing = chain.some((c) => !c.episodes);
+  const hasOngoing = chain.some((c) => c.isOngoing);
   // Cache the result for every season in the chain (one walk serves them all)
   chain.forEach((c, i) => {
     franchiseCache.set(String(c.id), {
