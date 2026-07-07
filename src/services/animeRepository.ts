@@ -160,3 +160,73 @@ export async function fetchChatHistory(
   }
   return (data ?? []).map((r: any) => ({ role: r.role, content: r.content }));
 }
+
+
+// ---- WATCH STATUS (move between Watching/Completed/Plan/Dropped) ----
+export async function setWatchStatus(
+  userId: string,
+  animeId: string,
+  status: WatchStatus
+): Promise<void> {
+  const { error } = await supabase.from('saved').upsert({
+    user_id: userId,
+    anime_id: animeId,
+    status,
+    saved_at: new Date().toISOString(),
+  });
+  if (error) console.warn('[setWatchStatus]', error.message);
+}
+
+// ---- FAVORITES (independent flag) ----
+export async function fetchFavorites(userId: string): Promise<string[]> {
+  const { data, error } = await supabase
+    .from('favorites')
+    .select('anime_id')
+    .eq('user_id', userId);
+  if (error) {
+    console.warn('[fetchFavorites]', error.message);
+    return [];
+  }
+  return (data ?? []).map((r: any) => r.anime_id);
+}
+
+export async function addFavorite(userId: string, animeId: string): Promise<void> {
+  const { error } = await supabase
+    .from('favorites')
+    .upsert({ user_id: userId, anime_id: animeId });
+  if (error) console.warn('[addFavorite]', error.message);
+}
+
+export async function removeFavorite(userId: string, animeId: string): Promise<void> {
+  const { error } = await supabase
+    .from('favorites')
+    .delete()
+    .eq('user_id', userId)
+    .eq('anime_id', animeId);
+  if (error) console.warn('[removeFavorite]', error.message);
+}
+
+// ---- RESTORE DROPPED (bring passed anime back into rotation) ----
+// Returns the anime_ids that were dropped, so the swipe deck can exclude
+// them from "seen" and show them again. Also clears their dropped status.
+export async function restoreDropped(userId: string): Promise<string[]> {
+  const { data, error } = await supabase
+    .from('saved')
+    .select('anime_id')
+    .eq('user_id', userId)
+    .eq('status', 'dropped');
+  if (error) {
+    console.warn('[restoreDropped]', error.message);
+    return [];
+  }
+  const ids = (data ?? []).map((r: any) => r.anime_id);
+  if (ids.length > 0) {
+    const { error: delErr } = await supabase
+      .from('saved')
+      .delete()
+      .eq('user_id', userId)
+      .eq('status', 'dropped');
+    if (delErr) console.warn('[restoreDropped delete]', delErr.message);
+  }
+  return ids;
+}

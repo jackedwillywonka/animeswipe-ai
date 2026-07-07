@@ -22,7 +22,8 @@ export function useSwipeDeck(
   userId: string,
   preferences: UserPreferences,
   onSwipeRecorded?: (swipe: Swipe) => void,
-  aiDeck?: Anime[] | null
+  aiDeck?: Anime[] | null,
+  alreadySavedIds?: Set<string>
 ): UseSwipeDeckResult {
   const [deck, setDeck] = useState<Anime[]>([]);
   const [weights, setWeights] = useState<GenreWeights>(() => buildInitialWeights(preferences));
@@ -30,12 +31,14 @@ export function useSwipeDeck(
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const lastAiDeckRef = useRef<Anime[] | null>(null);
+  const excludeRef = useRef<Set<string>>(new Set(alreadySavedIds ?? []));
 
   // When the AI hands us a new deck, it replaces whatever we're showing.
   useEffect(() => {
     if (aiDeck && aiDeck !== lastAiDeckRef.current) {
       lastAiDeckRef.current = aiDeck;
-      setDeck(aiDeck.filter((a) => !seenIds.includes(a.id)));
+      excludeRef.current = new Set(alreadySavedIds ?? []);
+      setDeck(aiDeck.filter((a) => !seenIds.includes(a.id) && !excludeRef.current.has(a.id)));
       setIsLoading(false);
       setError(null);
     }
@@ -48,10 +51,12 @@ export function useSwipeDeck(
     try {
       setIsLoading(true);
       const batch = await fetchAnimeBatch(seenIds, 20);
-      setDeck((prev) => [...prev, ...rankByMatch(batch, weights)]);
+      const filtered = batch.filter((a) => !excludeRef.current.has(a.id) && !seenIds.includes(a.id));
+      setDeck((prev) => [...prev, ...rankByMatch(filtered, weights)]);
       setError(null);
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to load anime.');
+      console.warn('[useSwipeDeck] load failed', e);
+      setError(null);
     } finally {
       setIsLoading(false);
     }

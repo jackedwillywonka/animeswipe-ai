@@ -22,6 +22,10 @@ interface AnimeDetailsScreenProps {
   onSelectSimilar: (anime: Anime) => void;
   isSaved: boolean;
   onToggleSave: () => void;
+  currentStatus?: string;
+  isFavorite: boolean;
+  onSetStatus: (status: string) => void;
+  onToggleFavorite: () => void;
 }
 
 export function AnimeDetailsScreen({
@@ -32,9 +36,18 @@ export function AnimeDetailsScreen({
   onSelectSimilar,
   isSaved,
   onToggleSave,
+  currentStatus,
+  isFavorite,
+  onSetStatus,
+  onToggleFavorite,
 }: AnimeDetailsScreenProps) {
+  const [localStatus, setLocalStatus] = useState<string | undefined>(currentStatus);
+  const [localFav, setLocalFav] = useState<boolean>(isFavorite);
   const [aiExplanation, setAiExplanation] = useState<string>(match?.aiExplanation ?? '');
   const [loadingExplanation, setLoadingExplanation] = useState(!match?.aiExplanation);
+
+  useEffect(() => { setLocalStatus(currentStatus); }, [currentStatus]);
+  useEffect(() => { setLocalFav(isFavorite); }, [isFavorite]);
 
   useEffect(() => {
     let cancelled = false;
@@ -92,6 +105,40 @@ export function AnimeDetailsScreen({
               )}
             </View>
           )}
+
+
+          <View style={styles.statusSection}>
+            <View style={styles.statusRow}>
+              {(['watching', 'completed', 'plan_to_watch', 'dropped'] as const).map((st) => {
+                const labels: Record<string, string> = {
+                  watching: 'Watching',
+                  completed: 'Completed',
+                  plan_to_watch: 'Plan to Watch',
+                  dropped: 'Dropped',
+                };
+                const active = localStatus === st;
+                return (
+                  <Pressable
+                    key={st}
+                    onPress={() => { setLocalStatus(st); onSetStatus(st); }}
+                    style={[styles.statusChip, active && styles.statusChipActive]}
+                  >
+                    <Text style={[styles.statusChipText, active && styles.statusChipTextActive]}>
+                      {labels[st]}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+            <Pressable
+              onPress={onToggleFavorite}
+              style={[styles.favButton, isFavorite && styles.favButtonActive]}
+            >
+              <Text style={styles.favButtonText}>
+                {isFavorite ? '♥ Favorited' : '♡ Add to Favorites'}
+              </Text>
+            </Pressable>
+          </View>
 
           <Section title="Why we picked this for you">
             <Text style={styles.bodyText}>
@@ -258,6 +305,51 @@ const styles = StyleSheet.create({
   },
   section: {
     marginBottom: spacing.lg,
+  },
+  statusSection: {
+    marginBottom: spacing.lg,
+  },
+  statusRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.sm,
+    marginBottom: spacing.sm,
+  },
+  statusChip: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderRadius: radius.pill,
+    borderWidth: 1.5,
+    borderColor: colors.border,
+    backgroundColor: colors.surfaceGlass,
+  },
+  statusChipActive: {
+    borderColor: colors.violetCore,
+    backgroundColor: colors.violetDeep,
+  },
+  statusChipText: {
+    ...typography.bodyMedium,
+    color: colors.textSecondary,
+    fontSize: 13,
+  },
+  statusChipTextActive: {
+    color: colors.textPrimary,
+  },
+  favButton: {
+    alignSelf: 'flex-start',
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderRadius: radius.pill,
+    borderWidth: 1.5,
+    borderColor: colors.pink,
+  },
+  favButtonActive: {
+    backgroundColor: colors.pink,
+  },
+  favButtonText: {
+    ...typography.bodyMedium,
+    color: colors.textPrimary,
+    fontSize: 13,
   },
   sectionTitle: {
     ...typography.heading,

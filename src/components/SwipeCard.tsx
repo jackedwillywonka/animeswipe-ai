@@ -22,9 +22,10 @@ interface SwipeCardProps {
   onSwiped: (direction: SwipeDirection) => void;
   onTap?: () => void;
   isTopCard: boolean;
+  isFavorite?: boolean;
 }
 
-export function SwipeCard({ anime, match, onSwiped, onTap, isTopCard }: SwipeCardProps) {
+export function SwipeCard({ anime, match, onSwiped, onTap, isTopCard, isFavorite }: SwipeCardProps) {
   // Static back card: no gestures, no animations, no gradient - just poster + title.
   if (!isTopCard) {
     return (
@@ -101,6 +102,11 @@ export function SwipeCard({ anime, match, onSwiped, onTap, isTopCard }: SwipeCar
     <GestureDetector gesture={composedGesture}>
       <Animated.View style={[styles.card, shadows.card, cardStyle]}>
         <Image source={{ uri: anime.posterUrl }} style={styles.poster} resizeMode="cover" />
+        {isFavorite && (
+          <View style={styles.favBadge}>
+            <Text style={styles.favBadgeText}>♥</Text>
+          </View>
+        )}
         <LinearGradient colors={gradients.screenFade} style={styles.fade} />
 
         <Animated.View style={[styles.stamp, styles.likeStamp, likeStampStyle]}>
@@ -157,6 +163,21 @@ const styles = StyleSheet.create({
   },
   poster: {
     ...StyleSheet.absoluteFillObject,
+  },
+  favBadge: {
+    position: 'absolute',
+    top: spacing.md,
+    left: spacing.md,
+    width: 36,
+    height: 36,
+    borderRadius: radius.pill,
+    backgroundColor: colors.pink,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  favBadgeText: {
+    color: colors.white,
+    fontSize: 18,
   },
   fade: {
     position: 'absolute',

@@ -4,8 +4,14 @@ import {
   fetchSwipeHistory,
   removeSavedAnime,
   saveAnime,
+  setWatchStatus,
+  fetchFavorites,
+  addFavorite,
+  removeFavorite,
+  restoreDropped,
 } from '@/services/animeRepository';
 import { getDeviceUserId } from '@/services/deviceUser';
+import { loadCacheFromDisk } from '@/services/anilistService';
 import { getAnimeById as getMockAnimeById } from '@/services/animeRepository';
 import type { Swipe, UserPreferences, UserStats, WatchStatus } from '@/types';
 
@@ -16,6 +22,11 @@ interface AppContextValue {
   preferences: UserPreferences;
   setPreferences: (prefs: UserPreferences) => void;
   savedAnimeIds: Set<string>;
+  favoriteIds: Set<string>;
+  statusById: Record<string, string>;
+  setStatus: (animeId: string, status: WatchStatus) => Promise<void>;
+  toggleFavorite: (animeId: string) => Promise<void>;
+  restoreDroppedAnime: () => Promise<string[]>;
   toggleSaved: (animeId: string, status?: WatchStatus) => Promise<void>;
   recordLocalSwipe: (swipe: Swipe) => void;
   stats: UserStats;
@@ -36,16 +47,24 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [userId, setUserId] = useState<string>('');
   const [preferences, setPreferences] = useState<UserPreferences>(DEFAULT_PREFERENCES);
   const [savedAnimeIds, setSavedAnimeIds] = useState<Set<string>>(new Set());
+  const [favoriteIds, setFavoriteIds] = useState<Set<string>>(new Set());
+  const [statusById, setStatusById] = useState<Record<string, string>>({});
   const [swipeHistory, setSwipeHistory] = useState<Swipe[]>([]);
 
   useEffect(() => {
     (async () => {
+      await loadCacheFromDisk();
       const id = await getDeviceUserId();
       setUserId(id);
       const items = await fetchSavedList(id);
       setSavedAnimeIds(new Set(items.map((i) => i.animeId)));
+      const map: Record<string, string> = {};
+      items.forEach((i) => { map[i.animeId] = i.status; });
+      setStatusById(map);
       const history = await fetchSwipeHistory(id);
       setSwipeHistory(history);
+      const favs = await fetchFavorites(id);
+      setFavoriteIds(new Set(favs));
     })();
   }, []);
 
@@ -110,11 +129,53 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     };
   }, [swipeHistory]);
 
+  const setStatus = useCallback(
+    async (animeId: string, status: WatchStatus) => {
+      if (!userId) return;
+      setSavedAnimeIds((prev) => new Set(prev).add(animeId));
+      setStatusById((prev) => ({ ...prev, [animeId]: status }));
+      await setWatchStatus(userId, animeId, status);
+    },
+    [userId]
+  );
+
+  const toggleFavorite = useCallback(
+    async (animeId: string) => {
+      if (!userId) return;
+      const isFav = favoriteIds.has(animeId);
+      setFavoriteIds((prev) => {
+        const next = new Set(prev);
+        if (isFav) next.delete(animeId);
+        else next.add(animeId);
+        return next;
+      });
+      if (isFav) await removeFavorite(userId, animeId);
+      else await addFavorite(userId, animeId);
+    },
+    [userId, favoriteIds]
+  );
+
+  const restoreDroppedAnime = useCallback(async () => {
+    if (!userId) return [];
+    const ids = await restoreDropped(userId);
+    setSavedAnimeIds((prev) => {
+      const next = new Set(prev);
+      ids.forEach((id) => next.delete(id));
+      return next;
+    });
+    return ids;
+  }, [userId]);
+
   const value: AppContextValue = {
     userId,
     preferences,
     setPreferences,
     savedAnimeIds,
+    favoriteIds,
+    statusById,
+    setStatus,
+    toggleFavorite,
+    restoreDroppedAnime,
     toggleSaved,
     recordLocalSwipe,
     stats,

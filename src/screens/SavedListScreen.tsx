@@ -1,58 +1,79 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { FlatList, Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { colors, radius, spacing, typography } from '@/theme/tokens';
 import { fetchSavedList, getAnimeByIdAsync } from '@/services/animeRepository';
 import { useAppContext } from '@/state/AppContext';
-import { getAnimeById as getMockAnimeById } from '@/services/animeRepository';
 import type { Anime, SavedAnime, WatchStatus } from '@/types';
 
 const TABS: { key: WatchStatus; label: string }[] = [
   { key: 'watching', label: 'Watching' },
   { key: 'completed', label: 'Completed' },
   { key: 'plan_to_watch', label: 'Plan to Watch' },
-  { key: 'favorites', label: 'Favorites' },
   { key: 'dropped', label: 'Dropped' },
 ];
 
 interface SavedListScreenProps {
-  userId: string;
   onSelectAnime: (anime: Anime) => void;
 }
 
+interface ResolvedItem {
+  anime: Anime;
+  savedAt: string;
+}
+
 export function SavedListScreen({ onSelectAnime }: SavedListScreenProps) {
-  const { userId, savedAnimeIds } = useAppContext();
+  const { userId, savedAnimeIds, favoriteIds, restoreDroppedAnime } = useAppContext();
+  const [restoreMsg, setRestoreMsg] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<WatchStatus>('plan_to_watch');
   const [savedItems, setSavedItems] = useState<SavedAnime[]>([]);
-  const [resolvedAnime, setResolvedAnime] = useState<Anime[]>([]);
+  const [resolvedItems, setResolvedItems] = useState<ResolvedItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
+  // Reload the saved list whenever the user's saved set changes or favorites change
   useEffect(() => {
     if (!userId) return;
     fetchSavedList(userId)
       .then(setSavedItems)
       .finally(() => setIsLoading(false));
-  }, [userId, savedAnimeIds]);
+  }, [userId, savedAnimeIds, favoriteIds]);
 
+  // Resolve anime details for the active tab, sorted newest-first
   useEffect(() => {
     let cancelled = false;
-    const forTab = savedItems.filter((sv) => sv.status === activeTab);
+    const forTab = savedItems
+      .filter((sv) => sv.status === activeTab)
+      .sort((a, b) => (b.savedAt || '').localeCompare(a.savedAt || '')); // newest first
     (async () => {
       const results = await Promise.all(
-        forTab.map((sv) => getAnimeByIdAsync(sv.animeId))
+        forTab.map(async (sv) => {
+          const anime = await getAnimeByIdAsync(sv.animeId);
+          return anime ? { anime, savedAt: sv.savedAt } : null;
+        })
       );
       if (!cancelled) {
-        setResolvedAnime(results.filter((a): a is Anime => Boolean(a)));
+        setResolvedItems(results.filter((r): r is ResolvedItem => Boolean(r)));
       }
     })();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [savedItems, activeTab]);
 
-  const itemsForTab = resolvedAnime;
+  async function handleRestore() {
+    const ids = await restoreDroppedAnime();
+    setRestoreMsg(
+      ids.length > 0
+        ? `Restored ${ids.length} anime to your swipe deck!`
+        : 'No dropped anime to restore.'
+    );
+    setSavedItems((prev) => prev.filter((s) => !ids.includes(s.animeId)));
+    setTimeout(() => setRestoreMsg(null), 2500);
+  }
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
-      <Text style={styles.header}>Saved</Text>
+      <Text style={styles.header}>My Library</Text>
 
       <View style={styles.tabRow}>
         {TABS.map((tab) => (
@@ -68,27 +89,41 @@ export function SavedListScreen({ onSelectAnime }: SavedListScreenProps) {
         ))}
       </View>
 
-      {!isLoading && itemsForTab.length === 0 && (
+      {activeTab === 'dropped' && (
+        <Pressable style={styles.restoreButton} onPress={handleRestore}>
+          <Text style={styles.restoreButtonText}>↻ Restore all dropped to swipe deck</Text>
+        </Pressable>
+      )}
+      {restoreMsg && <Text style={styles.restoreMsg}>{restoreMsg}</Text>}
+
+      {!isLoading && resolvedItems.length === 0 && (
         <View style={styles.emptyState}>
           <Text style={styles.emptyText}>
-            Nothing here yet. Swipe right on anime you want to watch and they'll show up here.
+            Nothing here yet. Swipe on anime and they'll show up in these sections.
           </Text>
         </View>
       )}
 
       <FlatList
-        data={itemsForTab}
-        keyExtractor={(item) => item.id}
+        data={resolvedItems}
+        keyExtractor={(item) => item.anime.id}
         numColumns={2}
         contentContainerStyle={styles.grid}
         columnWrapperStyle={{ gap: spacing.md }}
         renderItem={({ item }) => (
-          <Pressable style={styles.card} onPress={() => onSelectAnime(item)}>
-            <Image source={{ uri: item.posterUrl }} style={styles.poster} />
+          <Pressable style={styles.card} onPress={() => onSelectAnime(item.anime)}>
+            <View>
+              <Image source={{ uri: item.anime.posterUrl }} style={styles.poster} />
+              {favoriteIds.has(item.anime.id) && (
+                <View style={styles.heartBadge}>
+                  <Text style={styles.heartBadgeText}>♥</Text>
+                </View>
+              )}
+            </View>
             <Text style={styles.cardTitle} numberOfLines={1}>
-              {item.title}
+              {item.anime.title}
             </Text>
-            <Text style={styles.cardMeta}>{item.episodes} eps</Text>
+            <Text style={styles.cardMeta}>{item.anime.episodes} eps</Text>
           </Pressable>
         )}
       />
@@ -97,10 +132,7 @@ export function SavedListScreen({ onSelectAnime }: SavedListScreenProps) {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.background,
-  },
+  container: { flex: 1, backgroundColor: colors.background },
   header: {
     ...typography.display,
     color: colors.textPrimary,
@@ -124,27 +156,29 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
   },
-  tabActive: {
-    backgroundColor: colors.violetDeep,
+  tabActive: { backgroundColor: colors.violetDeep, borderColor: colors.violetCore },
+  tabText: { ...typography.bodyMedium, color: colors.textSecondary, fontSize: 13 },
+  tabTextActive: { color: colors.textPrimary },
+  restoreButton: {
+    marginHorizontal: spacing.lg,
+    marginBottom: spacing.md,
+    paddingVertical: spacing.md,
+    borderRadius: radius.pill,
+    borderWidth: 1.5,
     borderColor: colors.violetCore,
+    backgroundColor: colors.violetDeep,
+    alignItems: 'center',
   },
-  tabText: {
-    ...typography.bodyMedium,
-    color: colors.textSecondary,
+  restoreButtonText: { ...typography.bodyMedium, color: colors.violetLight, fontSize: 14 },
+  restoreMsg: {
+    ...typography.body,
+    color: colors.like,
+    textAlign: 'center',
+    marginBottom: spacing.md,
     fontSize: 13,
   },
-  tabTextActive: {
-    color: colors.textPrimary,
-  },
-  grid: {
-    paddingHorizontal: spacing.lg,
-    gap: spacing.md,
-    paddingBottom: spacing.xl,
-  },
-  card: {
-    flex: 1,
-    marginBottom: spacing.md,
-  },
+  grid: { paddingHorizontal: spacing.lg, gap: spacing.md, paddingBottom: spacing.xl },
+  card: { flex: 1, marginBottom: spacing.md },
   poster: {
     width: '100%',
     aspectRatio: 0.7,
@@ -152,20 +186,21 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
     marginBottom: spacing.xs,
   },
-  cardTitle: {
-    ...typography.bodyMedium,
-    color: colors.textPrimary,
-    fontSize: 13,
+  heartBadge: {
+    position: 'absolute',
+    top: spacing.sm,
+    left: spacing.sm,
+    width: 30,
+    height: 30,
+    borderRadius: radius.pill,
+    backgroundColor: '#FF1E4E',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
-  cardMeta: {
-    ...typography.body,
-    color: colors.textTertiary,
-    fontSize: 11,
-  },
-  emptyState: {
-    paddingHorizontal: spacing.xl,
-    marginTop: spacing.xl,
-  },
+  heartBadgeText: { color: colors.white, fontSize: 15, fontWeight: '700' },
+  cardTitle: { ...typography.bodyMedium, color: colors.textPrimary, fontSize: 13 },
+  cardMeta: { ...typography.body, color: colors.textTertiary, fontSize: 11 },
+  emptyState: { paddingHorizontal: spacing.xl, marginTop: spacing.xl },
   emptyText: {
     ...typography.body,
     color: colors.textSecondary,

@@ -1,3 +1,4 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { Anime, StreamingLink } from '@/types';
 
 /**
@@ -29,13 +30,52 @@ const MEDIA_FIELDS = `
 `;
 
 const animeCache = new Map<string, Anime>();
+const CACHE_KEY = 'anime_cache_v1';
+let cacheLoaded = false;
+
+export async function loadCacheFromDisk(): Promise<void> {
+  if (cacheLoaded) return;
+  try {
+    const raw = await AsyncStorage.getItem(CACHE_KEY);
+    if (raw) {
+      const arr: Anime[] = JSON.parse(raw);
+      arr.forEach((a) => animeCache.set(a.id, a));
+    }
+  } catch {}
+  cacheLoaded = true;
+}
+
+let saveTimer: any = null;
+function persistCache() {
+  if (saveTimer) clearTimeout(saveTimer);
+  saveTimer = setTimeout(async () => {
+    try {
+      const arr = Array.from(animeCache.values());
+      await AsyncStorage.setItem(CACHE_KEY, JSON.stringify(arr));
+    } catch {}
+  }, 1000);
+}
 
 async function gqlRequest<T>(query: string, variables: Record<string, unknown>): Promise<T> {
+  return gqlRequestWithRetry<T>(query, variables, 3);
+}
+
+async function gqlRequestWithRetry<T>(
+  query: string,
+  variables: Record<string, unknown>,
+  retries: number
+): Promise<T> {
   const res = await fetch(ANILIST_URL, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
     body: JSON.stringify({ query, variables }),
   });
+  if (res.status === 429 && retries > 0) {
+    // Rate limited - wait and retry with backoff
+    const retryAfter = Number(res.headers.get('Retry-After')) || 2;
+    await new Promise((r) => setTimeout(r, retryAfter * 1000));
+    return gqlRequestWithRetry<T>(query, variables, retries - 1);
+  }
   if (!res.ok) {
     throw new Error(`AniList request failed (${res.status})`);
   }
@@ -104,6 +144,7 @@ function mapMedia(m: any): Anime {
       : undefined,
   };
   animeCache.set(anime.id, anime);
+  persistCache();
   return anime;
 }
 

@@ -16,7 +16,7 @@ type Nav = NativeStackNavigationProp<RootStackParamList>;
 
 export function SwipeScreen() {
   const navigation = useNavigation<Nav>();
-  const { userId, preferences, recordLocalSwipe, toggleSaved, savedAnimeIds } = useAppContext();
+  const { userId, preferences, recordLocalSwipe, toggleSaved, savedAnimeIds, favoriteIds, setStatus } = useAppContext();
   const { memory, aiDeck, setAiDeck } = useAiSession();
   const [chatOpen, setChatOpen] = useState(false);
 
@@ -24,7 +24,8 @@ export function SwipeScreen() {
     userId,
     preferences,
     recordLocalSwipe,
-    aiDeck
+    aiDeck,
+    savedAnimeIds
   );
 
   const upcoming = deck.slice(1, 2);
@@ -32,12 +33,16 @@ export function SwipeScreen() {
   const handleDecision = React.useCallback(
     (direction: 'left' | 'right') => {
       const current = deck[0];
-      if (current && direction === 'right' && !savedAnimeIds.has(current.id)) {
-        toggleSaved(current.id, 'plan_to_watch');
+      if (current) {
+        if (direction === 'right') {
+          setStatus(current.id, 'plan_to_watch');
+        } else {
+          setStatus(current.id, 'dropped');
+        }
       }
       swipe(direction);
     },
-    [deck, savedAnimeIds, toggleSaved, swipe]
+    [deck, setStatus, swipe]
   );
 
   function openDetails() {

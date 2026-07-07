@@ -49,7 +49,7 @@ export function RootNavigator({
   onLoginApple,
   onLoginEmail,
 }: RootNavigatorProps) {
-  const { preferences, savedAnimeIds, toggleSaved } = useAppContext();
+  const { preferences, savedAnimeIds, toggleSaved, favoriteIds, setStatus, toggleFavorite, statusById } = useAppContext();
   const { memory, setAiDeck } = useAiSession();
 
   return (
@@ -108,6 +108,10 @@ export function RootNavigator({
                     }
                     isSaved={savedAnimeIds.has(anime.id)}
                     onToggleSave={() => toggleSaved(anime.id)}
+                    currentStatus={statusById[anime.id]}
+                    isFavorite={favoriteIds.has(anime.id)}
+                    onSetStatus={(st) => setStatus(anime.id, st as any)}
+                    onToggleFavorite={() => toggleFavorite(anime.id)}
                   />
                 );
               }}
