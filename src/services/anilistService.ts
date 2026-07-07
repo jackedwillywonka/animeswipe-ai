@@ -65,10 +65,8 @@ async function gqlRequestWithRetry<T>(
   variables: Record<string, unknown>,
   retries: number
 ): Promise<T> {
-  console.warn(`[anilist] request starting (retries left: ${retries})`);
   const controller = new AbortController();
   const timeout = setTimeout(() => {
-    console.warn('[anilist] request timed out after 15s - aborting');
     controller.abort();
   }, 15000);
   let res: Response;
@@ -82,11 +80,9 @@ async function gqlRequestWithRetry<T>(
   } finally {
     clearTimeout(timeout);
   }
-  console.warn(`[anilist] response status: ${res.status}`);
   if (res.status === 429 && retries > 0) {
     // Rate limited - wait and retry (capped at 10s so we never hang silently)
     const retryAfter = Math.min(Number(res.headers.get('Retry-After')) || 2, 10);
-    console.warn(`[anilist] 429 rate limited - waiting ${retryAfter}s then retrying`);
     await new Promise((r) => setTimeout(r, retryAfter * 1000));
     return gqlRequestWithRetry<T>(query, variables, retries - 1);
   }
@@ -179,14 +175,12 @@ export async function fetchPopularAnime(
   const idNotIn = excludeIds
     .map((id) => Number(id))
     .filter((n) => !Number.isNaN(n));
-  console.warn('[fetchPopularAnime] calling AniList...');
   const data = await gqlRequest<any>(query, {
     page,
     perPage,
     idNotIn: idNotIn.length ? idNotIn : undefined,
   });
   const mapped = (data?.Page?.media ?? []).filter((m: any) => !m.isAdult && !isSequel(m)).map(mapMedia);
-  console.warn(`[fetchPopularAnime] got ${mapped.length} anime back`);
   return mapped;
 }
 

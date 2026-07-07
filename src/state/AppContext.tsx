@@ -55,9 +55,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     (async () => {
-      console.warn('[AppContext] loading disk cache...');
       await loadCacheFromDisk();
-      console.warn('[AppContext] disk cache loaded');
       const id = await getDeviceUserId();
       setUserId(id);
       const items = await fetchSavedList(id);
@@ -74,7 +72,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   const toggleSaved = useCallback(
     async (animeId: string, status: WatchStatus = 'plan_to_watch') => {
-      console.warn('[SAVE] userId=', userId || 'EMPTY');
       if (!userId) return;
       const isSaved = savedAnimeIds.has(animeId);
       // Optimistic update
