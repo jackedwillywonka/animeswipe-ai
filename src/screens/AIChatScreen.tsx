@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import {
   FlatList,
-  KeyboardAvoidingView,
+  Keyboard,
   Platform,
   Pressable,
   StyleSheet,
@@ -9,7 +9,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, radius, spacing, typography } from '@/theme/tokens';
 import {
   GREETING,
@@ -29,6 +29,25 @@ interface AIChatScreenProps {
 export function AIChatScreen({ memory, onDeckReady, onClose, isSheet }: AIChatScreenProps) {
   const [input, setInput] = useState('');
   const [isThinking, setIsThinking] = useState(false);
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
+  const insets = useSafeAreaInsets();
+
+  // KeyboardAvoidingView is unreliable inside pageSheet modals on iOS,
+  // so we track the keyboard height ourselves and pad the bottom manually.
+  useEffect(() => {
+    const showEvt = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
+    const hideEvt = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
+    const showSub = Keyboard.addListener(showEvt, (e) =>
+      setKeyboardHeight(e.endCoordinates.height)
+    );
+    const hideSub = Keyboard.addListener(hideEvt, () => setKeyboardHeight(0));
+    return () => {
+      showSub.remove();
+      hideSub.remove();
+    };
+  }, []);
+
+  const bottomPad = Math.max(0, keyboardHeight - (isSheet ? 0 : insets.bottom));
   const [, forceRender] = useState(0);
   const listRef = useRef<FlatList<ChatMessage>>(null);
 
@@ -88,11 +107,7 @@ export function AIChatScreen({ memory, onDeckReady, onClose, isSheet }: AIChatSc
         </View>
       )}
 
-      <KeyboardAvoidingView
-        style={styles.flex}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        keyboardVerticalOffset={isSheet ? 8 : 40}
-      >
+      <View style={[styles.flex, { paddingBottom: bottomPad }]}>
         <FlatList
           ref={listRef}
           data={memory.messages}
@@ -143,7 +158,7 @@ export function AIChatScreen({ memory, onDeckReady, onClose, isSheet }: AIChatSc
             <Text style={styles.sendButtonText}>↑</Text>
           </Pressable>
         </View>
-      </KeyboardAvoidingView>
+      </View>
     </SafeAreaView>
   );
 }

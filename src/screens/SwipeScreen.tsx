@@ -96,7 +96,6 @@ export function SwipeScreen() {
           <SwipeCard
             key={currentAnime.id}
             anime={currentAnime}
-            match={currentMatch}
             onSwiped={(dir) => handleDecision(dir)}
             onTap={openDetails}
             isTopCard

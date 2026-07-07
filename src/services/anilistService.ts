@@ -257,3 +257,112 @@ export async function fetchAnimeById(id: string): Promise<Anime | null> {
     return null;
   }
 }
+
+
+// ---- FRANCHISE INFO (season position + totals across the whole series) ----
+export interface FranchiseInfo {
+  seasonNumber: number;
+  totalSeasons: number;
+  totalEpisodes: number;
+  hasOngoing: boolean;
+}
+
+const franchiseCache = new Map<string, FranchiseInfo>();
+const SEASON_FORMATS = ['TV', 'TV_SHORT', 'ONA'];
+
+const RELATION_QUERY = `
+  query ($id: Int) {
+    Media(id: $id, type: ANIME) {
+      id
+      episodes
+      relations {
+        edges {
+          relationType
+          node { id type format }
+        }
+      }
+    }
+  }
+`;
+
+interface ChainNode {
+  id: number;
+  episodes: number;
+  prequelId: number | null;
+  sequelId: number | null;
+}
+
+async function fetchChainNode(id: number): Promise<ChainNode | null> {
+  try {
+    const data = await gqlRequest<any>(RELATION_QUERY, { id });
+    const m = data?.Media;
+    if (!m) return null;
+    const edges = m.relations?.edges ?? [];
+    const findRel = (type: string) =>
+      edges.find(
+        (e: any) =>
+          e?.relationType === type &&
+          e?.node?.type === 'ANIME' &&
+          SEASON_FORMATS.includes(e?.node?.format)
+      )?.node?.id ?? null;
+    return {
+      id: m.id,
+      episodes: m.episodes ?? 0,
+      prequelId: findRel('PREQUEL'),
+      sequelId: findRel('SEQUEL'),
+    };
+  } catch {
+    return null;
+  }
+}
+
+export async function fetchFranchiseInfo(id: string): Promise<FranchiseInfo | null> {
+  const cached = franchiseCache.get(id);
+  if (cached) return cached;
+  const startId = Number(id);
+  if (Number.isNaN(startId)) return null;
+
+  const MAX_STEPS = 12;
+
+  // Walk backwards to Season 1
+  let root = await fetchChainNode(startId);
+  if (!root) return null;
+  const visited = new Set<number>([root.id]);
+  let steps = 0;
+  while (root.prequelId && !visited.has(root.prequelId) && steps < MAX_STEPS) {
+    const prev = await fetchChainNode(root.prequelId);
+    if (!prev) break;
+    visited.add(prev.id);
+    root = prev;
+    steps += 1;
+  }
+
+  // Walk forwards collecting every season
+  const chain: ChainNode[] = [root];
+  const seen = new Set<number>([root.id]);
+  let cur = root;
+  steps = 0;
+  while (cur.sequelId && !seen.has(cur.sequelId) && steps < MAX_STEPS) {
+    const next = await fetchChainNode(cur.sequelId);
+    if (!next) break;
+    seen.add(next.id);
+    chain.push(next);
+    cur = next;
+    steps += 1;
+  }
+
+  const totalEpisodes = chain.reduce((sum, c) => sum + (c.episodes || 0), 0);
+  // If any season has no episode count, the series is still running and
+  // a summed total would be misleading.
+  const hasOngoing = chain.some((c) => !c.episodes);
+  // Cache the result for every season in the chain (one walk serves them all)
+  chain.forEach((c, i) => {
+    franchiseCache.set(String(c.id), {
+      seasonNumber: i + 1,
+      totalSeasons: chain.length,
+      totalEpisodes,
+      hasOngoing,
+    });
+  });
+  return franchiseCache.get(id) ?? null;
+}

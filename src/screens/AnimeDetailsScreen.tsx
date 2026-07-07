@@ -9,9 +9,11 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import YoutubePlayer from 'react-native-youtube-iframe';
 import { colors, radius, spacing, typography } from '@/theme/tokens';
 import { getSimilarAnime as getMockSimilarAnime } from '@/services/animeRepository';
 import { explainRecommendation } from '@/services/aiService';
+import { fetchFranchiseInfo, type FranchiseInfo } from '@/services/anilistService';
 import type { Anime, MatchResult, UserPreferences } from '@/types';
 
 interface AnimeDetailsScreenProps {
@@ -43,10 +45,23 @@ export function AnimeDetailsScreen({
 }: AnimeDetailsScreenProps) {
   const [localStatus, setLocalStatus] = useState<string | undefined>(currentStatus);
   const [localFav, setLocalFav] = useState<boolean>(isFavorite);
+  const [trailerPlaying, setTrailerPlaying] = useState(false);
+  const [trailerBroken, setTrailerBroken] = useState(false);
   const [aiExplanation, setAiExplanation] = useState<string>(match?.aiExplanation ?? '');
   const [loadingExplanation, setLoadingExplanation] = useState(!match?.aiExplanation);
 
   useEffect(() => { setLocalStatus(currentStatus); }, [currentStatus]);
+  useEffect(() => { setTrailerPlaying(false); setTrailerBroken(false); }, [anime.id]);
+
+  const [franchise, setFranchise] = useState<FranchiseInfo | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    setFranchise(null);
+    fetchFranchiseInfo(anime.id)
+      .then((info) => { if (!cancelled) setFranchise(info); })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [anime.id]);
   useEffect(() => { setLocalFav(isFavorite); }, [isFavorite]);
 
   useEffect(() => {
@@ -84,26 +99,25 @@ export function AnimeDetailsScreen({
           <View style={styles.metaRow}>
             <Text style={styles.metaText}>★ {anime.rating.toFixed(1)}</Text>
             <Text style={styles.metaDot}>·</Text>
-            <Text style={styles.metaText}>{anime.episodes} eps{anime.format === 'TV' ? ' (this season)' : ''}</Text>
+            <Text style={styles.metaText}>
+              {anime.episodes > 0
+                ? `${anime.episodes} eps${franchise && franchise.totalSeasons > 1 ? ' (this season)' : ''}`
+                : anime.status === 'airing'
+                ? 'Ongoing'
+                : 'Episodes TBA'}
+            </Text>
             <Text style={styles.metaDot}>·</Text>
             <Text style={styles.metaText}>{anime.runtimeMinutes} min</Text>
             <Text style={styles.metaDot}>·</Text>
             <Text style={styles.metaText}>{anime.releaseYear}</Text>
           </View>
 
-          {match && (
-            <View style={styles.matchCard}>
-              <Text style={styles.matchPercent}>{match.matchPercent}% Match</Text>
-              {match.reasons.length > 0 && (
-                <View style={styles.reasonsRow}>
-                  {match.reasons.map((reason) => (
-                    <Text key={reason} style={styles.reasonItem}>
-                      ✓ {reason}
-                    </Text>
-                  ))}
-                </View>
-              )}
-            </View>
+          {franchise && (
+            <Text style={styles.franchiseText}>
+              {franchise.hasOngoing
+                ? `Season ${franchise.seasonNumber} of ${franchise.totalSeasons} · ongoing series`
+                : `Season ${franchise.seasonNumber} of ${franchise.totalSeasons} · ${franchise.totalEpisodes} episodes total`}
+            </Text>
           )}
 
 
@@ -139,6 +153,66 @@ export function AnimeDetailsScreen({
               </Text>
             </Pressable>
           </View>
+
+          <Section title="Trailer">
+              {trailerBroken || !anime.trailerYouTubeId ? (
+                <Pressable
+                  style={styles.tiktokButton}
+                  onPress={() =>
+                    Linking.openURL(
+                      `https://www.youtube.com/results?search_query=${encodeURIComponent(
+                        anime.title + ' trailer'
+                      )}`
+                    )
+                  }
+                >
+                  <Text style={styles.tiktokButtonText}>▶ Watch trailer on YouTube</Text>
+                </Pressable>
+              ) : trailerPlaying ? (
+                <View style={styles.trailerPlayerWrap}>
+                  <YoutubePlayer
+                    height={210}
+                    play
+                    videoId={anime.trailerYouTubeId}
+                    onError={() => setTrailerBroken(true)}
+                  />
+                </View>
+              ) : (
+                <Pressable
+                  style={styles.trailerThumbWrap}
+                  onPress={() => setTrailerPlaying(true)}
+                >
+                  <Image
+                    source={{ uri: `https://img.youtube.com/vi/${anime.trailerYouTubeId}/hqdefault.jpg` }}
+                    style={styles.trailerThumb}
+                    resizeMode="cover"
+                  />
+                  <View style={styles.trailerPlayBadge}>
+                    <Text style={styles.trailerPlayIcon}>▶</Text>
+                  </View>
+                </Pressable>
+              )}
+            </Section>
+
+          <Section title="Fan edits">
+            <Pressable
+              style={styles.tiktokButton}
+              onPress={async () => {
+                const q = encodeURIComponent(anime.title + ' edit');
+                // Hashtag slug: "Black Clover" -> "blackcloveredit"
+                const tag = anime.title.toLowerCase().replace(/[^a-z0-9]/g, '') + 'edit';
+                try {
+                  // TikTok's internal scheme - honors search keywords
+                  await Linking.openURL(`snssdk1233://search?keyword=${q}`);
+                } catch {
+                  // Fall back to the hashtag page (reliably opens in the app)
+                  Linking.openURL(`https://www.tiktok.com/tag/${tag}`);
+                }
+              }}
+            >
+              <Text style={styles.tiktokButtonText}>🎬 Watch {anime.title} edits on TikTok</Text>
+            </Pressable>
+          </Section>
 
           <Section title="Why we picked this for you">
             <Text style={styles.bodyText}>
@@ -281,6 +355,12 @@ const styles = StyleSheet.create({
     color: colors.textTertiary,
     marginHorizontal: spacing.xs,
   },
+  franchiseText: {
+    ...typography.bodyMedium,
+    color: colors.violetLight,
+    fontSize: 14,
+    marginBottom: spacing.lg,
+  },
   matchCard: {
     backgroundColor: colors.violetDeep,
     borderRadius: radius.md,
@@ -381,6 +461,51 @@ const styles = StyleSheet.create({
     fontSize: 13,
     flexShrink: 1,
     textAlign: 'right',
+  },
+  trailerPlayerWrap: {
+    borderRadius: radius.md,
+    overflow: 'hidden',
+    backgroundColor: colors.surface,
+  },
+  trailerThumbWrap: {
+    borderRadius: radius.md,
+    overflow: 'hidden',
+    aspectRatio: 16 / 9,
+    backgroundColor: colors.surface,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  trailerThumb: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  trailerPlayBadge: {
+    width: 62,
+    height: 62,
+    borderRadius: radius.pill,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    borderWidth: 2,
+    borderColor: colors.pink,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  trailerPlayIcon: {
+    color: colors.textPrimary,
+    fontSize: 24,
+    marginLeft: 4,
+  },
+  tiktokButton: {
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.md,
+    borderRadius: radius.pill,
+    borderWidth: 1.5,
+    borderColor: colors.pink,
+    backgroundColor: colors.surfaceGlass,
+    alignItems: 'center',
+  },
+  tiktokButtonText: {
+    ...typography.bodyMedium,
+    color: colors.textPrimary,
+    fontSize: 14,
   },
   streamingRow: {
     flexDirection: 'row',
