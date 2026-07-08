@@ -1,3 +1,4 @@
+import { Text } from 'react-native';
 import React from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { useNavigation } from '@react-navigation/native';
@@ -10,9 +11,11 @@ import { ProfileScreen } from '@/screens/ProfileScreen';
 import { colors } from '@/theme/tokens';
 import { useAppContext } from '@/state/AppContext';
 import type { RootStackParamList } from './RootNavigator';
+import { SearchScreen } from '@/screens/SearchScreen';
 
 export type MainTabParamList = {
   Swipe: undefined;
+  Search: undefined;
   Library: undefined;
   Profile: undefined;
 };
@@ -48,6 +51,13 @@ export function MainTabs() {
         },
       })}
     >
+      <Tab.Screen
+        name="Search"
+        component={SearchScreen}
+        options={{
+          tabBarIcon: ({ color }) => <Text style={{ color, fontSize: 18 }}>🔍</Text>,
+        }}
+      />
       <Tab.Screen name="Swipe" component={SwipeScreen} />
       <Tab.Screen name="Library">
         {() => (

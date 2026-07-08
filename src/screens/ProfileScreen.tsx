@@ -1,22 +1,48 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { colors, radius, spacing, typography } from '@/theme/tokens';
+import { useAppContext } from '@/state/AppContext';
+import { getAnimeByIdAsync } from '@/services/animeRepository';
 import type { UserStats } from '@/types';
 
 interface ProfileScreenProps {
   username: string;
-  stats: UserStats;
+  stats: UserStats; // kept for compatibility; no longer displayed
 }
 
-const BADGES = [
-  { id: 'first_anime', label: 'First Watch', emoji: '🎬', unlocked: true },
-  { id: 'hundred_eps', label: '100 Episodes', emoji: '💯', unlocked: true },
-  { id: 'hidden_gem', label: 'Hidden Gem Hunter', emoji: '💎', unlocked: false },
-  { id: 'streak_100', label: '100-Day Streak', emoji: '🔥', unlocked: false },
-];
+export function ProfileScreen({ username }: ProfileScreenProps) {
+  const { statusById } = useAppContext();
+  const [episodesWatched, setEpisodesWatched] = useState(0);
 
-export function ProfileScreen({ username, stats }: ProfileScreenProps) {
+  const completedIds = Object.keys(statusById).filter(
+    (id) => statusById[id] === 'completed'
+  );
+
+  // Sum episode counts for everything marked Completed.
+  // Finished shows use their full count; ongoing shows (e.g. One Piece)
+  // count all episodes aired so far - if you say you completed it, you earned it.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      let total = 0;
+      for (const id of completedIds) {
+        const anime = await getAnimeByIdAsync(id).catch(() => undefined);
+        if (!anime) continue;
+        if (anime.episodes > 0) {
+          total += anime.episodes;
+        } else if (anime.nextAiring?.episode) {
+          total += anime.nextAiring.episode - 1;
+        }
+      }
+      if (!cancelled) setEpisodesWatched(total);
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [JSON.stringify(completedIds)]);
+
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.content}>
@@ -27,77 +53,17 @@ export function ProfileScreen({ username, stats }: ProfileScreenProps) {
           <Text style={styles.username}>{username}</Text>
         </View>
 
-        <View style={styles.statsGrid}>
-          <StatCard label="Watched" value={stats.animeWatched} />
-          <StatCard label="Liked" value={stats.animeLiked} />
-          <StatCard label="Skipped" value={stats.animeSkipped} />
-          <StatCard label="Hours Watched" value={stats.hoursWatched} />
-          <StatCard label="Watch Streak" value={`${stats.watchStreakDays}d`} />
+        <View style={styles.heroCard}>
+          <Text style={styles.heroValue}>{episodesWatched.toLocaleString()}</Text>
+          <Text style={styles.heroLabel}>Episodes Watched</Text>
         </View>
 
-        <Section title="Favorite Genres">
-          <View style={styles.pillRow}>
-            {stats.favoriteGenres.length > 0 ? (
-              stats.favoriteGenres.map((genre) => (
-                <View key={genre} style={styles.pill}>
-                  <Text style={styles.pillText}>{genre}</Text>
-                </View>
-              ))
-            ) : (
-              <Text style={styles.emptyText}>Keep swiping to build your taste profile.</Text>
-            )}
-          </View>
-        </Section>
-
-        <Section title="Favorite Studios">
-          <View style={styles.pillRow}>
-            {stats.favoriteStudios.length > 0 ? (
-              stats.favoriteStudios.map((studio) => (
-                <View key={studio} style={styles.pill}>
-                  <Text style={styles.pillText}>{studio}</Text>
-                </View>
-              ))
-            ) : (
-              <Text style={styles.emptyText}>No standout studio yet.</Text>
-            )}
-          </View>
-        </Section>
-
-        <Section title="Badges">
-          <View style={styles.badgeGrid}>
-            {BADGES.map((badge) => (
-              <View
-                key={badge.id}
-                style={[styles.badge, !badge.unlocked && styles.badgeLocked]}
-              >
-                <Text style={styles.badgeEmoji}>{badge.emoji}</Text>
-                <Text style={[styles.badgeLabel, !badge.unlocked && styles.badgeLabelLocked]}>
-                  {badge.label}
-                </Text>
-              </View>
-            ))}
-          </View>
-        </Section>
+        <View style={styles.subCard}>
+          <Text style={styles.subValue}>{completedIds.length.toLocaleString()}</Text>
+          <Text style={styles.subLabel}>Anime Completed</Text>
+        </View>
       </ScrollView>
     </SafeAreaView>
-  );
-}
-
-function StatCard({ label, value }: { label: string; value: string | number }) {
-  return (
-    <View style={styles.statCard}>
-      <Text style={styles.statValue}>{value}</Text>
-      <Text style={styles.statLabel}>{label}</Text>
-    </View>
-  );
-}
-
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
-  return (
-    <View style={styles.section}>
-      <Text style={styles.sectionTitle}>{title}</Text>
-      {children}
-    </View>
   );
 }
 
@@ -133,94 +99,43 @@ const styles = StyleSheet.create({
     color: colors.textPrimary,
     fontSize: 20,
   },
-  statsGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: spacing.sm,
-    marginBottom: spacing.xl,
-  },
-  statCard: {
-    flexBasis: '31%',
-    flexGrow: 1,
-    backgroundColor: colors.surfaceGlass,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.md,
-    paddingVertical: spacing.md,
+  heroCard: {
+    backgroundColor: colors.violetDeep,
+    borderWidth: 1.5,
+    borderColor: colors.violetCore,
+    borderRadius: radius.lg,
+    paddingVertical: spacing.xl,
     alignItems: 'center',
+    marginBottom: spacing.md,
   },
-  statValue: {
+  heroValue: {
     ...typography.display,
     color: colors.violetLight,
-    fontSize: 22,
+    fontSize: 56,
   },
-  statLabel: {
-    ...typography.body,
-    color: colors.textTertiary,
-    fontSize: 11,
-    marginTop: 2,
-    textAlign: 'center',
-  },
-  section: {
-    marginBottom: spacing.xl,
-  },
-  sectionTitle: {
-    ...typography.heading,
-    color: colors.textPrimary,
-    fontSize: 16,
-    marginBottom: spacing.sm,
-  },
-  pillRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: spacing.sm,
-  },
-  pill: {
-    backgroundColor: colors.surfaceGlass,
-    borderRadius: radius.pill,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.xs,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  pillText: {
+  heroLabel: {
     ...typography.bodyMedium,
     color: colors.textSecondary,
-    fontSize: 13,
+    fontSize: 14,
+    marginTop: spacing.xs,
   },
-  emptyText: {
+  subCard: {
+    backgroundColor: colors.surfaceGlass,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.lg,
+    paddingVertical: spacing.lg,
+    alignItems: 'center',
+  },
+  subValue: {
+    ...typography.display,
+    color: colors.textPrimary,
+    fontSize: 34,
+  },
+  subLabel: {
     ...typography.body,
     color: colors.textTertiary,
     fontSize: 13,
-  },
-  badgeGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: spacing.sm,
-  },
-  badge: {
-    flexBasis: '47%',
-    flexGrow: 1,
-    backgroundColor: colors.violetDeep,
-    borderRadius: radius.md,
-    paddingVertical: spacing.md,
-    alignItems: 'center',
-  },
-  badgeLocked: {
-    backgroundColor: colors.surfaceGlass,
-    opacity: 0.5,
-  },
-  badgeEmoji: {
-    fontSize: 28,
-    marginBottom: spacing.xs,
-  },
-  badgeLabel: {
-    ...typography.bodyMedium,
-    color: colors.textPrimary,
-    fontSize: 12,
-    textAlign: 'center',
-  },
-  badgeLabelLocked: {
-    color: colors.textTertiary,
+    marginTop: spacing.xs,
   },
 });

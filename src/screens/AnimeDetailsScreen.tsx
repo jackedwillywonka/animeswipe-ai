@@ -30,6 +30,15 @@ interface AnimeDetailsScreenProps {
   onToggleFavorite: () => void;
 }
 
+
+const FORMAT_LABELS: Record<string, string> = {
+  MOVIE: 'Movie',
+  SPECIAL: 'Special',
+  OVA: 'OVA',
+  ONA: 'ONA',
+  MUSIC: 'Music Video',
+};
+
 export function AnimeDetailsScreen({
   anime,
   match,
@@ -100,7 +109,9 @@ export function AnimeDetailsScreen({
             <Text style={styles.metaText}>★ {anime.rating.toFixed(1)}</Text>
             <Text style={styles.metaDot}>·</Text>
             <Text style={styles.metaText}>
-              {anime.episodes > 0
+              {anime.format && FORMAT_LABELS[anime.format]
+                ? FORMAT_LABELS[anime.format]
+                : anime.episodes > 0
                 ? `${anime.episodes} eps${franchise && franchise.totalSeasons > 1 ? ' (this season)' : ''}`
                 : anime.nextAiring?.episode
                 ? `${anime.nextAiring.episode - 1} eps (so far)`
@@ -114,7 +125,7 @@ export function AnimeDetailsScreen({
             <Text style={styles.metaText}>{anime.releaseYear}</Text>
           </View>
 
-          {franchise && (
+          {franchise && !(anime.format && FORMAT_LABELS[anime.format]) && (
             <Text style={styles.franchiseText}>
               {franchise.hasOngoing
                 ? franchise.totalEpisodes > 0

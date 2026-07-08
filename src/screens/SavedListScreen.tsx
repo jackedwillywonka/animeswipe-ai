@@ -177,6 +177,11 @@ export function SavedListScreen({ onSelectAnime }: SavedListScreenProps) {
             </Text>
             <Text style={styles.cardMeta}>
               {(() => {
+                const FORMAT_LABELS: Record<string, string> = {
+                  MOVIE: 'Movie', SPECIAL: 'Special', OVA: 'OVA', ONA: 'ONA', MUSIC: 'Music Video',
+                };
+                if (item.anime.format && FORMAT_LABELS[item.anime.format])
+                  return FORMAT_LABELS[item.anime.format];
                 const fr = franchiseById[item.anime.id];
                 if (item.anime.episodes > 0) {
                   if (fr && fr.totalSeasons > 1) return `${item.anime.episodes} eps (this season)`;
