@@ -11,6 +11,11 @@ import {
   restoreDropped,
 } from '@/services/animeRepository';
 import { getDeviceUserId } from '@/services/deviceUser';
+import {
+  getCurrentSession,
+  onAuthStateChange,
+  migrateDeviceDataToUser,
+} from '@/services/authService';
 import { loadCacheFromDisk } from '@/services/anilistService';
 import { getAnimeById as getMockAnimeById } from '@/services/animeRepository';
 import type { Swipe, UserPreferences, UserStats, WatchStatus } from '@/types';
@@ -53,21 +58,43 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [statusChangedAt, setStatusChangedAt] = useState<Record<string, string>>({});
   const [swipeHistory, setSwipeHistory] = useState<Swipe[]>([]);
 
+  const loadUserData = useCallback(async (id: string) => {
+    setUserId(id);
+    const items = await fetchSavedList(id);
+    setSavedAnimeIds(new Set(items.map((i) => i.animeId)));
+    const map: Record<string, string> = {};
+    items.forEach((i) => { map[i.animeId] = i.status; });
+    setStatusById(map);
+    const history = await fetchSwipeHistory(id);
+    setSwipeHistory(history);
+    const favs = await fetchFavorites(id);
+    setFavoriteIds(new Set(favs));
+  }, []);
+
   useEffect(() => {
+    let unsubscribe: (() => void) | undefined;
     (async () => {
       await loadCacheFromDisk();
-      const id = await getDeviceUserId();
-      setUserId(id);
-      const items = await fetchSavedList(id);
-      setSavedAnimeIds(new Set(items.map((i) => i.animeId)));
-      const map: Record<string, string> = {};
-      items.forEach((i) => { map[i.animeId] = i.status; });
-      setStatusById(map);
-      const history = await fetchSwipeHistory(id);
-      setSwipeHistory(history);
-      const favs = await fetchFavorites(id);
-      setFavoriteIds(new Set(favs));
+      const session = await getCurrentSession();
+      const deviceId = await getDeviceUserId();
+      if (session?.user?.id) {
+        await migrateDeviceDataToUser(session.user.id);
+        await loadUserData(session.user.id);
+      } else {
+        await loadUserData(deviceId);
+      }
+      // When the user logs in or out, switch identities and reload everything.
+      unsubscribe = onAuthStateChange(async (s) => {
+        if (s?.user?.id) {
+          await migrateDeviceDataToUser(s.user.id);
+          await loadUserData(s.user.id);
+        } else {
+          await loadUserData(deviceId);
+        }
+      });
     })();
+    return () => unsubscribe?.();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const toggleSaved = useCallback(

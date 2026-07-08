@@ -4,6 +4,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { colors, radius, spacing, typography } from '@/theme/tokens';
 import { useAppContext } from '@/state/AppContext';
 import { getAnimeByIdAsync } from '@/services/animeRepository';
+import { signOut } from '@/services/authService';
+import { Pressable } from 'react-native';
 import type { UserStats } from '@/types';
 
 interface ProfileScreenProps {
@@ -62,6 +64,13 @@ export function ProfileScreen({ username }: ProfileScreenProps) {
           <Text style={styles.subValue}>{completedIds.length.toLocaleString()}</Text>
           <Text style={styles.subLabel}>Anime Completed</Text>
         </View>
+
+        <Pressable
+          onPress={() => signOut()}
+          style={styles.signOutButton}
+        >
+          <Text style={styles.signOutText}>Sign Out</Text>
+        </Pressable>
       </ScrollView>
     </SafeAreaView>
   );
@@ -131,6 +140,20 @@ const styles = StyleSheet.create({
     ...typography.display,
     color: colors.textPrimary,
     fontSize: 34,
+  },
+  signOutButton: {
+    marginTop: spacing.xl,
+    alignSelf: 'center',
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+    borderRadius: radius.pill,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  signOutText: {
+    ...typography.bodyMedium,
+    color: colors.textTertiary,
+    fontSize: 14,
   },
   subLabel: {
     ...typography.body,

@@ -1,30 +1,64 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { StatusBar } from 'expo-status-bar';
 import * as SplashScreenModule from 'expo-splash-screen';
 import { useFonts as useSora, Sora_600SemiBold, Sora_700Bold } from '@expo-google-fonts/sora';
 import { useFonts as useInter, Inter_400Regular, Inter_500Medium } from '@expo-google-fonts/inter';
+import type { Session } from '@supabase/supabase-js';
 import { SplashScreen } from '@/screens/SplashScreen';
+import { EmailAuthScreen } from '@/screens/EmailAuthScreen';
 import { RootNavigator } from '@/navigation/RootNavigator';
 import { AppProvider } from '@/state/AppContext';
 import { AiSessionProvider } from '@/state/AiSessionContext';
+import {
+  getCurrentSession,
+  onAuthStateChange,
+  signInWithGoogle,
+} from '@/services/authService';
 import { colors } from '@/theme/tokens';
 
 SplashScreenModule.preventAutoHideAsync();
 
 function AppInner() {
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [session, setSession] = useState<Session | null>(null);
+  const [authChecked, setAuthChecked] = useState(false);
+  const [emailAuthOpen, setEmailAuthOpen] = useState(false);
 
-  function handleLogin() {
-    setIsAuthenticated(true);
+  // On launch: restore any saved session, then listen for login/logout.
+  useEffect(() => {
+    getCurrentSession().then((s) => {
+      setSession(s);
+      setAuthChecked(true);
+    });
+    const unsubscribe = onAuthStateChange(setSession);
+    return unsubscribe;
+  }, []);
+
+  // Wait until we know whether the user is already logged in
+  // (prevents a login-screen flash for returning users).
+  if (!authChecked) return null;
+
+  if (emailAuthOpen && !session) {
+    return (
+      <EmailAuthScreen
+        onBack={() => setEmailAuthOpen(false)}
+        onAuthenticated={() => setEmailAuthOpen(false)}
+      />
+    );
   }
 
   return (
     <RootNavigator
-      isAuthenticated={isAuthenticated}
-      onLoginGoogle={handleLogin}
-      onLoginApple={handleLogin}
-      onLoginEmail={handleLogin}
+      isAuthenticated={!!session}
+      onLoginGoogle={async () => {
+        try {
+          await signInWithGoogle();
+        } catch (e) {
+          console.warn('[auth] Google sign-in failed:', e);
+        }
+      }}
+      onLoginApple={() => {}}
+      onLoginEmail={() => setEmailAuthOpen(true)}
     />
   );
 }

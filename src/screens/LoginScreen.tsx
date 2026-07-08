@@ -25,8 +25,7 @@ export function LoginScreen({ onLoginGoogle, onLoginApple, onLoginEmail }: Login
       </View>
 
       <View style={styles.actions}>
-        <AuthButton label="Continue with Apple" onPress={onLoginApple} variant="filled" />
-        <AuthButton label="Continue with Google" onPress={onLoginGoogle} variant="outline" />
+        <AuthButton label="Continue with Google" onPress={onLoginGoogle} variant="filled" />
         <AuthButton label="Continue with Email" onPress={onLoginEmail} variant="outline" />
       </View>
 
