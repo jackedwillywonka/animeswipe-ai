@@ -12,7 +12,9 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { colors, gradients, radius, shadows, spacing, typography } from '@/theme/tokens';
 import type { Anime, MatchResult, SwipeDirection } from '@/types';
 
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
+// Cap at 480 so the card sizes to the phone-width web frame, not the monitor.
+// On actual phones the screen is narrower than 480, so nothing changes there.
+const SCREEN_WIDTH = Math.min(Dimensions.get('window').width, 480);
 const SWIPE_THRESHOLD = SCREEN_WIDTH * 0.28;
 const ROTATION_RANGE = 12; // degrees at full swipe
 
@@ -145,8 +147,13 @@ export function SwipeCard({ anime, match, onSwiped, onTap, isTopCard, isFavorite
   );
 }
 
-const CARD_WIDTH = SCREEN_WIDTH * 0.9;
-const CARD_HEIGHT = CARD_WIDTH * 1.45;
+// Height cap: never taller than ~62% of the window, so the card can't
+// overflow up into the header on short browser windows. Phones are tall
+// enough that this cap never kicks in there.
+const SCREEN_HEIGHT = Dimensions.get('window').height;
+const CARD_WIDTH_RAW = SCREEN_WIDTH * 0.9;
+const CARD_HEIGHT = Math.min(CARD_WIDTH_RAW * 1.45, SCREEN_HEIGHT * 0.62);
+const CARD_WIDTH = CARD_HEIGHT / 1.45;
 
 const styles = StyleSheet.create({
   backCard: {

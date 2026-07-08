@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
+import { Platform, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { StatusBar } from 'expo-status-bar';
 import * as SplashScreenModule from 'expo-splash-screen';
@@ -84,7 +85,7 @@ export default function App() {
     return <SplashScreen onFinished={() => setShowCustomSplash(false)} />;
   }
 
-  return (
+  const appTree = (
     <GestureHandlerRootView style={{ flex: 1, backgroundColor: colors.background }} onLayout={onLayoutRootView}>
       <StatusBar style="light" />
       <AppProvider>
@@ -94,4 +95,16 @@ export default function App() {
       </AppProvider>
     </GestureHandlerRootView>
   );
+
+  // On web, present the app in a centered phone-width frame so desktop
+  // visitors see a clean mobile layout instead of a stretched one.
+  if (Platform.OS === 'web') {
+    return (
+      <View style={{ flex: 1, backgroundColor: '#000', alignItems: 'center' }}>
+        <View style={{ flex: 1, width: '100%', maxWidth: 480 }}>{appTree}</View>
+      </View>
+    );
+  }
+
+  return appTree;
 }

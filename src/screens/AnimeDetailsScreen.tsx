@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import {
   Image,
   Linking,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -9,7 +10,7 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import YoutubePlayer from 'react-native-youtube-iframe';
+import { TrailerPlayer } from '@/components/TrailerPlayer';
 import { colors, radius, spacing, typography } from '@/theme/tokens';
 import { getSimilarAnime as getMockSimilarAnime } from '@/services/animeRepository';
 import { explainRecommendation } from '@/services/aiService';
@@ -185,10 +186,9 @@ export function AnimeDetailsScreen({
                 </Pressable>
               ) : trailerPlaying ? (
                 <View style={styles.trailerPlayerWrap}>
-                  <YoutubePlayer
-                    height={210}
-                    play
+                  <TrailerPlayer
                     videoId={anime.trailerYouTubeId}
+                    height={210}
                     onError={() => setTrailerBroken(true)}
                   />
                 </View>
@@ -216,6 +216,11 @@ export function AnimeDetailsScreen({
                 const q = encodeURIComponent(anime.title + ' edit');
                 // Hashtag slug: "Black Clover" -> "blackcloveredit"
                 const tag = anime.title.toLowerCase().replace(/[^a-z0-9]/g, '') + 'edit';
+                if (Platform.OS === 'web') {
+                  // No app schemes in browsers - hashtag pages render publicly
+                  Linking.openURL(`https://www.tiktok.com/tag/${tag}`);
+                  return;
+                }
                 try {
                   // TikTok's internal scheme - honors search keywords
                   await Linking.openURL(`snssdk1233://search?keyword=${q}`);
