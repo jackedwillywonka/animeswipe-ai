@@ -49,7 +49,7 @@ export function RootNavigator({
   onLoginApple,
   onLoginEmail,
 }: RootNavigatorProps) {
-  const { preferences, savedAnimeIds, toggleSaved, favoriteIds, setStatus, toggleFavorite, statusById } = useAppContext();
+  const { preferences, savedAnimeIds, toggleSaved, favoriteIds, setStatus, toggleFavorite, statusById, filters, setFilters } = useAppContext();
   const { memory, setAiDeck } = useAiSession();
 
   return (
@@ -119,8 +119,11 @@ export function RootNavigator({
             <Stack.Screen name="Filters" options={{ presentation: 'modal' }}>
               {({ navigation }) => (
                 <FilterScreen
-                  initialFilters={{}}
-                  onApply={() => navigation.goBack()}
+                  initialFilters={filters}
+                  onApply={(f) => {
+                    setFilters(f);
+                    navigation.goBack();
+                  }}
                   onClose={() => navigation.goBack()}
                 />
               )}

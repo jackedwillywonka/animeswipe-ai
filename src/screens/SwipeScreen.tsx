@@ -16,7 +16,7 @@ type Nav = NativeStackNavigationProp<RootStackParamList>;
 
 export function SwipeScreen() {
   const navigation = useNavigation<Nav>();
-  const { userId, preferences, recordLocalSwipe, toggleSaved, savedAnimeIds, favoriteIds, setStatus } = useAppContext();
+  const { userId, preferences, recordLocalSwipe, toggleSaved, savedAnimeIds, favoriteIds, setStatus, filters } = useAppContext();
   const { memory, aiDeck, setAiDeck } = useAiSession();
   const [chatOpen, setChatOpen] = useState(false);
 
@@ -25,7 +25,8 @@ export function SwipeScreen() {
     preferences,
     recordLocalSwipe,
     aiDeck,
-    savedAnimeIds
+    savedAnimeIds,
+    filters
   );
 
   const upcoming = deck.slice(1, 2);

@@ -399,3 +399,102 @@ export async function fetchFranchiseInfo(id: string): Promise<FranchiseInfo | nu
   persistFranchiseCache();
   return franchiseCache.get(id) ?? null;
 }
+
+
+// ---- FILTERS ----
+export interface AppFilters {
+  genres: string[];
+  format: 'any' | 'tv' | 'movie';
+  status: 'any' | 'airing' | 'finished';
+  era: 'any' | '2020s' | '2010s' | '2000s' | 'older';
+  minScore: 0 | 6 | 7 | 8;
+}
+
+export const DEFAULT_FILTERS: AppFilters = {
+  genres: [],
+  format: 'any',
+  status: 'any',
+  era: 'any',
+  minScore: 0,
+};
+
+export function filtersActive(f?: AppFilters | null): boolean {
+  if (!f) return false;
+  return (
+    f.genres.length > 0 ||
+    f.format !== 'any' ||
+    f.status !== 'any' ||
+    f.era !== 'any' ||
+    f.minScore > 0
+  );
+}
+
+const ERA_RANGES: Record<string, { greater?: number; lesser?: number }> = {
+  '2020s': { greater: 20191231 },
+  '2010s': { greater: 20091231, lesser: 20200101 },
+  '2000s': { greater: 19991231, lesser: 20100101 },
+  older: { lesser: 20000101 },
+};
+
+export async function fetchFilteredAnime(
+  filters: AppFilters,
+  excludeIds: string[] = [],
+  perPage = 50,
+  page = 1
+): Promise<Anime[]> {
+  const query = `
+    query ($page: Int, $perPage: Int, $idNotIn: [Int], $genres: [String], $formats: [MediaFormat], $status: MediaStatus, $scoreGreater: Int, $startGreater: FuzzyDateInt, $startLesser: FuzzyDateInt) {
+      Page(page: $page, perPage: $perPage) {
+        media(type: ANIME, sort: POPULARITY_DESC, isAdult: false, id_not_in: $idNotIn, genre_in: $genres, format_in: $formats, status: $status, averageScore_greater: $scoreGreater, startDate_greater: $startGreater, startDate_lesser: $startLesser) {
+          ${MEDIA_FIELDS}
+        }
+      }
+    }
+  `;
+  const idNotIn = excludeIds.map((id) => Number(id)).filter((n) => !Number.isNaN(n));
+  const era = ERA_RANGES[filters.era] ?? {};
+  const variables: Record<string, unknown> = {
+    page,
+    perPage,
+    idNotIn: idNotIn.length ? idNotIn : undefined,
+    genres: filters.genres.length ? filters.genres : undefined,
+    formats:
+      filters.format === 'tv'
+        ? ['TV', 'TV_SHORT', 'ONA']
+        : filters.format === 'movie'
+        ? ['MOVIE']
+        : undefined,
+    status:
+      filters.status === 'airing'
+        ? 'RELEASING'
+        : filters.status === 'finished'
+        ? 'FINISHED'
+        : undefined,
+    scoreGreater: filters.minScore > 0 ? filters.minScore * 10 - 1 : undefined,
+    startGreater: era.greater,
+    startLesser: era.lesser,
+  };
+  const data = await gqlRequest<any>(query, variables);
+  // Keep movies even if they are franchise sequels; only dedupe series sequels
+  return (data?.Page?.media ?? [])
+    .filter((m: any) => !m.isAdult && (filters.format === 'movie' || !isSequel(m)))
+    .map(mapMedia);
+}
+
+/** Client-side version of the same rules, for filtering search results. */
+export function matchesFilters(anime: Anime, f: AppFilters): boolean {
+  if (f.genres.length > 0 && !f.genres.every((g) => anime.genres.includes(g))) return false;
+  if (f.format === 'movie' && anime.format !== 'MOVIE') return false;
+  if (f.format === 'tv' && anime.format === 'MOVIE') return false;
+  if (f.status === 'airing' && anime.status !== 'airing') return false;
+  if (f.status === 'finished' && anime.status !== 'finished') return false;
+  if (f.era !== 'any' && anime.releaseYear) {
+    const y = anime.releaseYear;
+    if (f.era === '2020s' && y < 2020) return false;
+    if (f.era === '2010s' && (y < 2010 || y > 2019)) return false;
+    if (f.era === '2000s' && (y < 2000 || y > 2009)) return false;
+    if (f.era === 'older' && y >= 2000) return false;
+  }
+  if (f.minScore > 0 && anime.rating < f.minScore) return false;
+  return true;
+}

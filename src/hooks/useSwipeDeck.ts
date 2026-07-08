@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { Anime, MatchResult, Swipe, UserPreferences } from '@/types';
 import { fetchAnimeBatch, recordSwipe } from '@/services/animeRepository';
+import type { AppFilters } from '@/services/anilistService';
 import {
   buildInitialWeights,
   rankByMatch,
@@ -23,7 +24,8 @@ export function useSwipeDeck(
   preferences: UserPreferences,
   onSwipeRecorded?: (swipe: Swipe) => void,
   aiDeck?: Anime[] | null,
-  alreadySavedIds?: Set<string>
+  alreadySavedIds?: Set<string>,
+  filters?: AppFilters
 ): UseSwipeDeckResult {
   const [deck, setDeck] = useState<Anime[]>([]);
   const [weights, setWeights] = useState<GenreWeights>(() => buildInitialWeights(preferences));
@@ -69,7 +71,7 @@ export function useSwipeDeck(
       // Exclude BOTH swiped-this-session AND everything already in the library,
       // so AniList returns anime the user hasn't touched.
       const excludeAll = Array.from(new Set([...seenIds, ...excludeRef.current]));
-      const batch = await fetchAnimeBatch(excludeAll, 20, pageRef.current);
+      const batch = await fetchAnimeBatch(excludeAll, 20, pageRef.current, filters);
       const filtered = batch.filter((a) => !excludeRef.current.has(a.id) && !seenIds.includes(a.id));
       if (filtered.length === 0) {
         emptyPagesRef.current += 1;
@@ -90,13 +92,28 @@ export function useSwipeDeck(
       setIsLoading(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [seenIds, weights]);
+  }, [seenIds, weights, filters]);
 
   useEffect(() => {
     if (!aiDeck) loadMore();
     else setIsLoading(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // When filters change, throw out the current deck and start fresh.
+  const filtersKeyRef = useRef<string>(JSON.stringify(filters ?? null));
+  useEffect(() => {
+    const key = JSON.stringify(filters ?? null);
+    if (key === filtersKeyRef.current) return; // skip initial mount
+    filtersKeyRef.current = key;
+    if (lastAiDeckRef.current) return; // AI decks are curated, not filtered
+    pageRef.current = 1;
+    emptyPagesRef.current = 0;
+    outOfAnimeRef.current = false;
+    setDeck([]);
+    loadMore();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filters]);
 
   const swipe = useCallback(
     async (direction: Swipe['direction']) => {

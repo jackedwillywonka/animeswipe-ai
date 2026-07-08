@@ -14,7 +14,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { colors, radius, spacing, typography } from '@/theme/tokens';
-import { searchAnimeByText } from '@/services/anilistService';
+import { searchAnimeByText, matchesFilters, filtersActive } from '@/services/anilistService';
+import { useAppContext } from '@/state/AppContext';
 import type { Anime } from '@/types';
 import type { RootStackParamList } from '@/navigation/RootNavigator';
 
@@ -22,6 +23,7 @@ type Nav = NativeStackNavigationProp<RootStackParamList>;
 
 export function SearchScreen() {
   const navigation = useNavigation<Nav>();
+  const { filters } = useAppContext();
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<Anime[]>([]);
   const [isSearching, setIsSearching] = useState(false);
@@ -104,9 +106,13 @@ export function SearchScreen() {
         </View>
       )}
 
+      {!isSearching && filtersActive(filters) && (
+        <Text style={styles.filterNotice}>Filters are on - some results may be hidden</Text>
+      )}
+
       {!isSearching && results.length > 0 && (
         <FlatList
-          data={results}
+          data={filtersActive(filters) ? results.filter((a) => matchesFilters(a, filters)) : results}
           keyExtractor={(a) => a.id}
           contentContainerStyle={styles.list}
           keyboardShouldPersistTaps="handled"
@@ -215,6 +221,13 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     fontSize: 14,
     lineHeight: 20,
+  },
+  filterNotice: {
+    ...typography.body,
+    color: colors.violetLight,
+    fontSize: 12,
+    textAlign: 'center',
+    marginBottom: spacing.sm,
   },
   list: {
     paddingHorizontal: spacing.lg,

@@ -2,46 +2,41 @@ import React, { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { colors, radius, spacing, typography } from '@/theme/tokens';
-import type { FilterOptions } from '@/types';
+import { DEFAULT_FILTERS, type AppFilters } from '@/services/anilistService';
 
+// AniList's actual genre list (what the API can filter by)
 const GENRES = [
-  'Action', 'Adventure', 'Comedy', 'Drama', 'Fantasy', 'Horror',
-  'Mystery', 'Romance', 'Sci-Fi', 'Slice of Life', 'Dark Fantasy',
+  'Action', 'Adventure', 'Comedy', 'Drama', 'Ecchi', 'Fantasy',
+  'Horror', 'Mahou Shoujo', 'Mecha', 'Music', 'Mystery', 'Psychological',
+  'Romance', 'Sci-Fi', 'Slice of Life', 'Sports', 'Supernatural', 'Thriller',
 ];
-const STUDIOS = ['MAPPA', 'Madhouse', 'WIT Studio', 'A-1 Pictures', 'Kyoto Animation', 'Bones'];
-const PLATFORMS = ['Crunchyroll', 'Netflix', 'Hulu', 'Funimation'];
 
 interface FilterScreenProps {
-  initialFilters: FilterOptions;
-  onApply: (filters: FilterOptions) => void;
+  initialFilters: AppFilters;
+  onApply: (filters: AppFilters) => void;
   onClose: () => void;
 }
 
 export function FilterScreen({ initialFilters, onApply, onClose }: FilterScreenProps) {
-  const [genres, setGenres] = useState<string[]>(initialFilters.genres ?? []);
-  const [type, setType] = useState<FilterOptions['type']>(initialFilters.type ?? 'either');
-  const [status, setStatus] = useState<FilterOptions['status']>(initialFilters.status ?? 'either');
-  const [language, setLanguage] = useState<FilterOptions['language']>(
-    initialFilters.language ?? 'either'
-  );
-  const [studio, setStudio] = useState<string | undefined>(initialFilters.studio);
-  const [platform, setPlatform] = useState<string | undefined>(initialFilters.platform);
+  const safeInitial: AppFilters = { ...DEFAULT_FILTERS, ...initialFilters };
+  const [genres, setGenres] = useState<string[]>(safeInitial.genres);
+  const [format, setFormat] = useState<AppFilters['format']>(safeInitial.format);
+  const [status, setStatus] = useState<AppFilters['status']>(safeInitial.status);
+  const [era, setEra] = useState<AppFilters['era']>(safeInitial.era);
+  const [minScore, setMinScore] = useState<AppFilters['minScore']>(safeInitial.minScore);
 
   function toggleGenre(genre: string) {
-    setGenres((prev) => (prev.includes(genre) ? prev.filter((g) => g !== genre) : [...prev, genre]));
+    setGenres((prev) =>
+      prev.includes(genre) ? prev.filter((g) => g !== genre) : [...prev, genre]
+    );
   }
 
   function handleReset() {
     setGenres([]);
-    setType('either');
-    setStatus('either');
-    setLanguage('either');
-    setStudio(undefined);
-    setPlatform(undefined);
-  }
-
-  function handleApply() {
-    onApply({ genres, type, status, language, studio, platform });
+    setFormat('any');
+    setStatus('any');
+    setEra('any');
+    setMinScore(0);
   }
 
   return (
@@ -57,64 +52,66 @@ export function FilterScreen({ initialFilters, onApply, onClose }: FilterScreenP
       </View>
 
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        <FilterSection title="Genre">
+        <FilterSection title="Genres">
           <ChipGrid options={GENRES} selected={genres} onToggle={toggleGenre} />
         </FilterSection>
 
-        <FilterSection title="Type">
+        <FilterSection title="Format">
           <SingleChoiceRow
             options={[
-              { key: 'movie', label: 'Movie' },
-              { key: 'series', label: 'Series' },
-              { key: 'either', label: 'Both' },
+              { key: 'any', label: 'Any' },
+              { key: 'tv', label: 'Series' },
+              { key: 'movie', label: 'Movies' },
             ]}
-            value={type}
-            onChange={(v) => setType(v as FilterOptions['type'])}
+            value={format}
+            onChange={(v) => setFormat(v as AppFilters['format'])}
           />
         </FilterSection>
 
         <FilterSection title="Status">
           <SingleChoiceRow
             options={[
-              { key: 'airing', label: 'Airing' },
+              { key: 'any', label: 'Any' },
+              { key: 'airing', label: 'Airing Now' },
               { key: 'finished', label: 'Finished' },
-              { key: 'either', label: 'Both' },
             ]}
             value={status}
-            onChange={(v) => setStatus(v as FilterOptions['status'])}
+            onChange={(v) => setStatus(v as AppFilters['status'])}
           />
         </FilterSection>
 
-        <FilterSection title="Language">
+        <FilterSection title="Era">
           <SingleChoiceRow
             options={[
-              { key: 'dub', label: 'Dub' },
-              { key: 'sub', label: 'Sub' },
-              { key: 'either', label: 'Both' },
+              { key: 'any', label: 'Any' },
+              { key: '2020s', label: '2020s' },
+              { key: '2010s', label: '2010s' },
+              { key: '2000s', label: '2000s' },
+              { key: 'older', label: 'Before 2000' },
             ]}
-            value={language}
-            onChange={(v) => setLanguage(v as FilterOptions['language'])}
+            value={era}
+            onChange={(v) => setEra(v as AppFilters['era'])}
           />
         </FilterSection>
 
-        <FilterSection title="Studio">
-          <ChipGrid
-            options={STUDIOS}
-            selected={studio ? [studio] : []}
-            onToggle={(s) => setStudio(studio === s ? undefined : s)}
-          />
-        </FilterSection>
-
-        <FilterSection title="Streaming Platform">
-          <ChipGrid
-            options={PLATFORMS}
-            selected={platform ? [platform] : []}
-            onToggle={(p) => setPlatform(platform === p ? undefined : p)}
+        <FilterSection title="Minimum Rating">
+          <SingleChoiceRow
+            options={[
+              { key: '0', label: 'Any' },
+              { key: '6', label: '6+' },
+              { key: '7', label: '7+' },
+              { key: '8', label: '8+' },
+            ]}
+            value={String(minScore)}
+            onChange={(v) => setMinScore(Number(v) as AppFilters['minScore'])}
           />
         </FilterSection>
       </ScrollView>
 
-      <Pressable style={styles.applyButton} onPress={handleApply}>
+      <Pressable
+        style={styles.applyButton}
+        onPress={() => onApply({ genres, format, status, era, minScore })}
+      >
         <Text style={styles.applyButtonText}>Apply Filters</Text>
       </Pressable>
     </SafeAreaView>
@@ -157,14 +154,14 @@ function ChipGrid({
   );
 }
 
-function SingleChoiceRow<T extends string>({
+function SingleChoiceRow({
   options,
   value,
   onChange,
 }: {
-  options: { key: T; label: string }[];
-  value: T | undefined;
-  onChange: (value: T) => void;
+  options: { key: string; label: string }[];
+  value: string | undefined;
+  onChange: (value: string) => void;
 }) {
   return (
     <View style={styles.chipGrid}>

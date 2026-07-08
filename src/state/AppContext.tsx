@@ -16,7 +16,7 @@ import {
   onAuthStateChange,
   migrateDeviceDataToUser,
 } from '@/services/authService';
-import { loadCacheFromDisk } from '@/services/anilistService';
+import { loadCacheFromDisk, DEFAULT_FILTERS, type AppFilters } from '@/services/anilistService';
 import { getAnimeById as getMockAnimeById } from '@/services/animeRepository';
 import type { Swipe, UserPreferences, UserStats, WatchStatus } from '@/types';
 
@@ -36,6 +36,8 @@ interface AppContextValue {
   toggleSaved: (animeId: string, status?: WatchStatus) => Promise<void>;
   recordLocalSwipe: (swipe: Swipe) => void;
   stats: UserStats;
+  filters: AppFilters;
+  setFilters: (f: AppFilters) => void;
 }
 
 const DEFAULT_PREFERENCES: UserPreferences = {
@@ -57,6 +59,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [statusById, setStatusById] = useState<Record<string, string>>({});
   const [statusChangedAt, setStatusChangedAt] = useState<Record<string, string>>({});
   const [swipeHistory, setSwipeHistory] = useState<Swipe[]>([]);
+  const [filters, setFilters] = useState<AppFilters>(DEFAULT_FILTERS);
 
   const loadUserData = useCallback(async (id: string) => {
     setUserId(id);
@@ -214,6 +217,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     toggleSaved,
     recordLocalSwipe,
     stats,
+    filters,
+    setFilters,
   };
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;

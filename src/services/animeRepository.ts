@@ -3,8 +3,11 @@ import { MOCK_ANIME, getMockAnimeById, getMockSimilarAnime } from '@/data/mockAn
 import {
   fetchPopularAnime,
   fetchAnimeById,
+  fetchFilteredAnime,
+  filtersActive,
   getCachedAnimeById,
   getSimilarFromCache,
+  type AppFilters,
 } from './anilistService';
 import type { Anime, Swipe, SavedAnime, UserPreferences, WatchStatus } from '@/types';
 
@@ -14,9 +17,16 @@ import type { Anime, Swipe, SavedAnime, UserPreferences, WatchStatus } from '@/t
  * - User data (swipes, saved, preferences, chat): persisted to Supabase.
  */
 
-export async function fetchAnimeBatch(excludeIds: string[], limit = 20, page = 1): Promise<Anime[]> {
+export async function fetchAnimeBatch(
+  excludeIds: string[],
+  limit = 20,
+  page = 1,
+  filters?: AppFilters
+): Promise<Anime[]> {
   try {
-    const fromApi = await fetchPopularAnime(excludeIds, limit, page);
+    const fromApi = filtersActive(filters)
+      ? await fetchFilteredAnime(filters!, excludeIds, limit, page)
+      : await fetchPopularAnime(excludeIds, limit, page);
     if (fromApi.length > 0) return fromApi;
   } catch (e) {
     console.warn('[animeRepository] AniList fetch failed, using local fallback', e);
