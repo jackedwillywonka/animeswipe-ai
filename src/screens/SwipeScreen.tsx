@@ -60,7 +60,7 @@ export function SwipeScreen() {
           Anime<Text style={{ color: colors.pink }}>Swipe</Text> AI
         </Text>
         <Pressable style={styles.filterButton} onPress={() => navigation.navigate('Filters')}>
-          <Text style={styles.filterIcon}>⚙</Text>
+          <Text style={styles.filterLabel}>Filters</Text>
         </Pressable>
       </View>
 
@@ -153,14 +153,15 @@ const styles = StyleSheet.create({
     color: colors.textPrimary,
   },
   filterButton: {
-    width: 32,
+    paddingHorizontal: spacing.sm,
     height: 32,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  filterIcon: {
-    fontSize: 20,
-    color: colors.textSecondary,
+  filterLabel: {
+    ...typography.bodyMedium,
+    color: colors.violetLight,
+    fontSize: 14,
   },
   aiDeckBadge: {
     alignSelf: 'center',

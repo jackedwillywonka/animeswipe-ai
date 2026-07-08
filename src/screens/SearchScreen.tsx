@@ -58,7 +58,12 @@ export function SearchScreen() {
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
-      <Text style={styles.header}>Search</Text>
+      <View style={styles.headerRow}>
+        <Text style={styles.header}>Search</Text>
+        <Pressable onPress={() => navigation.navigate('Filters')} style={styles.filterButton}>
+          <Text style={styles.filterLabel}>Filters</Text>
+        </Pressable>
+      </View>
       <View style={styles.searchRow}>
         <TextInput
           value={query}
@@ -144,13 +149,29 @@ export function SearchScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
+  headerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: spacing.lg,
+    marginTop: spacing.sm,
+    marginBottom: spacing.md,
+  },
   header: {
     ...typography.display,
     color: colors.textPrimary,
     fontSize: 24,
-    paddingHorizontal: spacing.lg,
-    marginTop: spacing.sm,
-    marginBottom: spacing.md,
+  },
+  filterButton: {
+    paddingHorizontal: spacing.sm,
+    height: 32,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  filterLabel: {
+    ...typography.bodyMedium,
+    color: colors.violetLight,
+    fontSize: 14,
   },
   searchRow: {
     flexDirection: 'row',

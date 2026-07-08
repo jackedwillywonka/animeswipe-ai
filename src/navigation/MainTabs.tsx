@@ -51,14 +51,14 @@ export function MainTabs() {
         },
       })}
     >
+      <Tab.Screen name="Swipe" component={SwipeScreen} />
       <Tab.Screen
         name="Search"
         component={SearchScreen}
         options={{
-          tabBarIcon: ({ color }) => <Text style={{ color, fontSize: 18 }}>🔍</Text>,
+          tabBarIcon: ({ color, size }) => <Ionicons name="search" size={size} color={color} />,
         }}
       />
-      <Tab.Screen name="Swipe" component={SwipeScreen} />
       <Tab.Screen name="Library">
         {() => (
           <SavedListScreen
