@@ -3,6 +3,8 @@ import { Platform, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { StatusBar } from 'expo-status-bar';
 import * as SplashScreenModule from 'expo-splash-screen';
+import { useFonts } from 'expo-font';
+import { Ionicons } from '@expo/vector-icons';
 import { useFonts as useSora, Sora_600SemiBold, Sora_700Bold } from '@expo-google-fonts/sora';
 import { useFonts as useInter, Inter_400Regular, Inter_500Medium } from '@expo-google-fonts/inter';
 import type { Session } from '@supabase/supabase-js';
@@ -69,7 +71,8 @@ export default function App() {
 
   const [soraLoaded] = useSora({ Sora_600SemiBold, Sora_700Bold });
   const [interLoaded] = useInter({ Inter_400Regular, Inter_500Medium });
-  const fontsLoaded = soraLoaded && interLoaded;
+  const [iconsLoaded] = useFonts(Ionicons.font);
+  const fontsLoaded = soraLoaded && interLoaded && iconsLoaded;
 
   const onLayoutRootView = useCallback(async () => {
     if (fontsLoaded) {

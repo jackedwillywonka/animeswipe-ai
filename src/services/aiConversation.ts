@@ -209,7 +209,6 @@ export async function processUserMessage(
   // ---- REAL AI PATH ----
   const brain = await askRealBrain(memory, avoidTitles);
   if (brain && brain.titles.length > 0) {
-    console.warn(`[ai] brain suggested ${brain.titles.length} titles`);
     const deck: Anime[] = [];
     const found = new Set<string>();
     // Look up each AI-suggested title on AniList (in small parallel batches)
@@ -229,8 +228,6 @@ export async function processUserMessage(
         }
       }
     }
-
-    console.warn(`[ai] after AniList lookup + seen filtering: ${deck.length} cards`);
     if (deck.length > 0) {
       memory.lastDeckIds = deck.map((a) => a.id);
       memory.messages.push({

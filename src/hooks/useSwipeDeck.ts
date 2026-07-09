@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Image } from 'react-native';
 import type { Anime, MatchResult, Swipe, UserPreferences } from '@/types';
 import { fetchAnimeBatch, recordSwipe } from '@/services/animeRepository';
 import type { AppFilters } from '@/services/anilistService';
@@ -146,6 +147,16 @@ export function useSwipeDeck(
       loadMore();
     }
   }, [deck.length, isLoading, loadMore]);
+
+  // Preload the next few posters so the card after a swipe is instant,
+  // not waiting on a fresh network fetch (biggest win on web).
+  useEffect(() => {
+    deck.slice(1, 5).forEach((a) => {
+      if (a.posterUrl) {
+        Image.prefetch(a.posterUrl).catch(() => {});
+      }
+    });
+  }, [deck]);
 
   const currentAnime = deck[0];
   const currentMatch = useMemo(

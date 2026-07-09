@@ -247,7 +247,16 @@ export function AnimeDetailsScreen({
           <Section title="Details">
             <DetailRow label="Studio" value={anime.studio} />
             <DetailRow label="Genres" value={anime.genres.join(', ')} />
-            <DetailRow label="Status" value={anime.status === 'airing' ? 'Airing' : 'Finished'} />
+            <DetailRow
+              label="Status"
+              value={
+                anime.status === 'airing'
+                  ? 'Airing'
+                  : franchise && franchise.hasOngoing
+                  ? 'Season finished · series continuing'
+                  : 'Finished'
+              }
+            />
             {anime.ageRating && <DetailRow label="Age Rating" value={anime.ageRating} />}
           </Section>
 
