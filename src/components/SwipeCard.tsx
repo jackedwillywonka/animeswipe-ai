@@ -187,7 +187,7 @@ export function SwipeCard({ anime: animeProp, match, onSwiped, onTap, isTopCard,
 // overflow up into the header on short browser windows.
 const SCREEN_HEIGHT = Dimensions.get('window').height;
 const CARD_WIDTH_RAW = SCREEN_WIDTH * 0.9;
-const CARD_HEIGHT = Math.min(CARD_WIDTH_RAW * 1.45, SCREEN_HEIGHT * 0.62);
+const CARD_HEIGHT = Math.min(CARD_WIDTH_RAW * 1.45, SCREEN_HEIGHT * 0.58);
 const CARD_WIDTH = CARD_HEIGHT / 1.45;
 
 const styles = StyleSheet.create({

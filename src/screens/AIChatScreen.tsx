@@ -19,6 +19,7 @@ import {
 } from '@/services/aiConversation';
 import { useAppContext } from '@/state/AppContext';
 import { getAnimeById } from '@/services/animeRepository';
+import { consumeAiChat, getAiQuotaStatus, FREE_DAILY_AI_LIMIT } from '@/services/premiumService';
 import type { Anime } from '@/types';
 
 interface AIChatScreenProps {
@@ -29,9 +30,11 @@ interface AIChatScreenProps {
 }
 
 export function AIChatScreen({ memory, onDeckReady, onClose, isSheet }: AIChatScreenProps) {
-  const { savedAnimeIds } = useAppContext();
+  const { savedAnimeIds, userId } = useAppContext();
   const [input, setInput] = useState('');
   const [isThinking, setIsThinking] = useState(false);
+  const [quota, setQuota] = useState<{ isPremium: boolean; usedToday: number } | null>(null);
+  const [capped, setCapped] = useState(false);
   const [keyboardHeight, setKeyboardHeight] = useState(0);
   const insets = useSafeAreaInsets();
 
@@ -55,6 +58,15 @@ export function AIChatScreen({ memory, onDeckReady, onClose, isSheet }: AIChatSc
   const listRef = useRef<FlatList<ChatMessage>>(null);
 
   useEffect(() => {
+    if (userId) {
+      getAiQuotaStatus(userId).then((q) => {
+        setQuota({ isPremium: q.isPremium, usedToday: q.usedToday });
+        setCapped(!q.allowed);
+      });
+    }
+  }, [userId]);
+
+  useEffect(() => {
     if (memory.messages.length === 0) {
       memory.messages.push({
         id: 'greeting',
@@ -69,6 +81,15 @@ export function AIChatScreen({ memory, onDeckReady, onClose, isSheet }: AIChatSc
   async function handleSend() {
     const text = input.trim();
     if (!text || isThinking) return;
+
+    // Gate: free users get FREE_DAILY_AI_LIMIT chats per day.
+    const q = await consumeAiChat(userId);
+    setQuota({ isPremium: q.isPremium, usedToday: q.usedToday });
+    if (!q.allowed) {
+      setCapped(true);
+      return; // don't send; the upgrade prompt renders instead
+    }
+
     setInput('');
     setIsThinking(true);
     forceRender((n) => n + 1); // show user's message immediately
@@ -114,6 +135,13 @@ export function AIChatScreen({ memory, onDeckReady, onClose, isSheet }: AIChatSc
         </View>
       )}
 
+      {quota && !quota.isPremium && !capped && (
+        <Text style={styles.quotaChip}>
+          {Math.max(0, FREE_DAILY_AI_LIMIT - quota.usedToday)} free AI chat
+          {FREE_DAILY_AI_LIMIT - quota.usedToday === 1 ? '' : 's'} left today
+        </Text>
+      )}
+
       <View style={[styles.flex, { paddingBottom: bottomPad }]}>
         <FlatList
           ref={listRef}
@@ -146,25 +174,41 @@ export function AIChatScreen({ memory, onDeckReady, onClose, isSheet }: AIChatSc
           }
         />
 
-        <View style={styles.inputRow}>
-          <TextInput
-            value={input}
-            onChangeText={setInput}
-            onSubmitEditing={handleSend}
-            placeholder="Describe what you want to watch…"
-            placeholderTextColor={colors.textTertiary}
-            style={styles.input}
-            returnKeyType="send"
-            multiline
-          />
-          <Pressable
-            onPress={handleSend}
-            disabled={isThinking || !input.trim()}
-            style={[styles.sendButton, (isThinking || !input.trim()) && styles.sendDisabled]}
-          >
-            <Text style={styles.sendButtonText}>↑</Text>
-          </Pressable>
-        </View>
+        {capped ? (
+          <View style={styles.upgradeBox}>
+            <Text style={styles.upgradeTitle}>You've used your {FREE_DAILY_AI_LIMIT} free AI chats today ✨</Text>
+            <Text style={styles.upgradeBody}>
+              Go Premium for unlimited AI recommendations and a smarter brain — $2.99/month.
+            </Text>
+            <Pressable
+              style={styles.upgradeButton}
+              onPress={() => { /* Stripe checkout wired in a later step */ }}
+            >
+              <Text style={styles.upgradeButtonText}>Upgrade to Premium</Text>
+            </Pressable>
+            <Text style={styles.upgradeReset}>Your free chats reset tomorrow.</Text>
+          </View>
+        ) : (
+          <View style={styles.inputRow}>
+            <TextInput
+              value={input}
+              onChangeText={setInput}
+              onSubmitEditing={handleSend}
+              placeholder="Describe what you want to watch…"
+              placeholderTextColor={colors.textTertiary}
+              style={styles.input}
+              returnKeyType="send"
+              multiline
+            />
+            <Pressable
+              onPress={handleSend}
+              disabled={isThinking || !input.trim()}
+              style={[styles.sendButton, (isThinking || !input.trim()) && styles.sendDisabled]}
+            >
+              <Text style={styles.sendButtonText}>↑</Text>
+            </Pressable>
+          </View>
+        )}
       </View>
     </SafeAreaView>
   );
@@ -228,6 +272,54 @@ const styles = StyleSheet.create({
   userBubbleText: {
     ...typography.body,
     color: colors.white,
+  },
+  quotaChip: {
+    ...typography.body,
+    color: colors.violetLight,
+    fontSize: 12,
+    textAlign: 'center',
+    paddingBottom: spacing.sm,
+  },
+  upgradeBox: {
+    margin: spacing.lg,
+    padding: spacing.lg,
+    borderRadius: radius.lg,
+    backgroundColor: colors.violetDeep,
+    borderWidth: 1.5,
+    borderColor: colors.violetCore,
+    alignItems: 'center',
+  },
+  upgradeTitle: {
+    ...typography.heading,
+    color: colors.textPrimary,
+    fontSize: 17,
+    textAlign: 'center',
+    marginBottom: spacing.sm,
+  },
+  upgradeBody: {
+    ...typography.body,
+    color: colors.textSecondary,
+    fontSize: 14,
+    textAlign: 'center',
+    lineHeight: 20,
+    marginBottom: spacing.md,
+  },
+  upgradeButton: {
+    backgroundColor: colors.violetCore,
+    borderRadius: radius.pill,
+    paddingHorizontal: spacing.xl,
+    paddingVertical: spacing.md,
+  },
+  upgradeButtonText: {
+    ...typography.bodyMedium,
+    color: colors.white,
+    fontSize: 15,
+  },
+  upgradeReset: {
+    ...typography.body,
+    color: colors.textTertiary,
+    fontSize: 12,
+    marginTop: spacing.sm,
   },
   inputRow: {
     flexDirection: 'row',
