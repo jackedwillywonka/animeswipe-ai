@@ -12,7 +12,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { TrailerPlayer } from '@/components/TrailerPlayer';
 import { colors, radius, spacing, typography } from '@/theme/tokens';
-import { getSimilarAnime as getMockSimilarAnime } from '@/services/animeRepository';
+import { getSimilarAnime as getMockSimilarAnime, getAnimeByIdAsync } from '@/services/animeRepository';
 import { explainRecommendation } from '@/services/aiService';
 import { fetchFranchiseInfo, type FranchiseInfo } from '@/services/anilistService';
 import type { Anime, MatchResult, UserPreferences } from '@/types';
@@ -41,7 +41,7 @@ const FORMAT_LABELS: Record<string, string> = {
 };
 
 export function AnimeDetailsScreen({
-  anime,
+  anime: animeProp,
   match,
   preferences,
   onBack,
@@ -53,6 +53,26 @@ export function AnimeDetailsScreen({
   onSetStatus,
   onToggleFavorite,
 }: AnimeDetailsScreenProps) {
+  // Self-healing: if this anime was cached during a rate-limit window it
+  // may be a stub with no poster. Refetch the real version and swap it in;
+  // the fetch also overwrites the broken cache entry for everywhere else.
+  const [healedAnime, setHealedAnime] = useState<typeof animeProp | null>(null);
+  useEffect(() => {
+    setHealedAnime(null);
+    if (!animeProp.posterUrl) {
+      getAnimeByIdAsync(animeProp.id)
+        .then((fresh) => {
+          if (fresh && fresh.posterUrl) setHealedAnime(fresh);
+        })
+        .catch(() => {});
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [animeProp.id]);
+  const anime = healedAnime ?? animeProp;
+  console.warn(
+    `[details] id=${animeProp.id} poster=${animeProp.posterUrl ? 'YES' : 'MISSING'} healed=${healedAnime ? 'YES' : 'no'} title=${animeProp.title}`
+  );
+
   const [localStatus, setLocalStatus] = useState<string | undefined>(currentStatus);
   const [localFav, setLocalFav] = useState<boolean>(isFavorite);
   const [trailerPlaying, setTrailerPlaying] = useState(false);

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useRef, useState } from 'react';
 import { Dimensions, Image, StyleSheet, Text, View } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
@@ -7,13 +7,13 @@ import Animated, {
   useAnimatedStyle,
   useSharedValue,
   withSpring,
+  withTiming,
 } from 'react-native-reanimated';
 import { LinearGradient } from 'expo-linear-gradient';
 import { colors, gradients, radius, shadows, spacing, typography } from '@/theme/tokens';
 import type { Anime, MatchResult, SwipeDirection } from '@/types';
 
 // Cap at 480 so the card sizes to the phone-width web frame, not the monitor.
-// On actual phones the screen is narrower than 480, so nothing changes there.
 const SCREEN_WIDTH = Math.min(Dimensions.get('window').width, 480);
 const SWIPE_THRESHOLD = SCREEN_WIDTH * 0.28;
 const ROTATION_RANGE = 12; // degrees at full swipe
@@ -27,24 +27,40 @@ interface SwipeCardProps {
   isFavorite?: boolean;
 }
 
-export function SwipeCard({ anime, match, onSwiped, onTap, isTopCard, isFavorite }: SwipeCardProps) {
-  // Static back card: no gestures, no animations, no gradient - just poster + title.
-  if (!isTopCard) {
-    return (
-      <View style={[styles.card, styles.backCard]}>
-        <Image source={{ uri: anime.posterUrl }} style={styles.poster} resizeMode="cover" />
-      </View>
-    );
-  }
-
+/**
+ * The card renders the SAME full tree whether it's the top card or a back
+ * card - gestures and animations are merely disabled in back position.
+ * Because cards are keyed by anime id, React promotes a back card to top
+ * card as a cheap prop update instead of a full remount, which is what
+ * makes the next card interactive instantly after a swipe.
+ */
+export function SwipeCard({ anime: animeProp, match, onSwiped, onTap, isTopCard, isFavorite }: SwipeCardProps) {
   const translateX = useSharedValue(0);
   const translateY = useSharedValue(0);
+
+  // Freeze the card's visuals during the exit fling: once a swipe passes
+  // the threshold we render from this captured copy, so the deck shifting
+  // underneath can't flash the next anime's art into the departing card.
+  const frozenRef = useRef<typeof animeProp | null>(null);
+  const [, forceRender] = useState(0);
+  const anime = frozenRef.current ?? animeProp;
+
+  const [isExiting, setIsExiting] = useState(false);
+
+  const startFreeze = () => {
+    frozenRef.current = animeProp;
+    setIsExiting(true);
+    forceRender((n) => n + 1);
+  };
 
   const handleSwipeComplete = (direction: SwipeDirection) => {
     onSwiped(direction);
     // Reset for the card's next appearance further back in the deck.
     translateX.value = 0;
     translateY.value = 0;
+    frozenRef.current = null;
+    setIsExiting(false);
+    forceRender((n) => n + 1);
   };
 
   const tap = Gesture.Tap()
@@ -66,7 +82,11 @@ export function SwipeCard({ anime, match, onSwiped, onTap, isTopCard, isFavorite
       if (passedThreshold) {
         const direction: SwipeDirection = e.translationX > 0 ? 'right' : 'left';
         const flingX = direction === 'right' ? SCREEN_WIDTH * 1.5 : -SCREEN_WIDTH * 1.5;
-        translateX.value = withSpring(flingX, { velocity: e.velocityX, damping: 18 }, () => {
+        runOnJS(startFreeze)();
+        // withTiming with a fixed short duration: the completion fires the
+        // moment the card is off-screen, instead of waiting for a spring's
+        // long invisible settling tail.
+        translateX.value = withTiming(flingX, { duration: 180 }, () => {
           runOnJS(handleSwipeComplete)(direction);
         });
       } else {
@@ -100,9 +120,25 @@ export function SwipeCard({ anime, match, onSwiped, onTap, isTopCard, isFavorite
 
   const composedGesture = onTap ? Gesture.Race(pan, tap) : pan;
 
+  // Nuclear anti-ghost: once the exit starts, this card simply stops
+  // rendering. The user's drag already communicated the swipe - removing
+  // the card instantly is what high-speed Tinder does too.
+  if (isExiting) {
+    return null;
+  }
+
   return (
     <GestureDetector gesture={composedGesture}>
-      <Animated.View style={[styles.card, shadows.card, cardStyle]}>
+      <Animated.View
+        style={[
+          styles.card,
+          isTopCard ? shadows.card : styles.backCard,
+          // A departing card sinks below everything so it can't cover the
+          // newly promoted top card during its exit frames.
+          { zIndex: isExiting ? 0 : isTopCard ? 2 : 1 },
+          cardStyle,
+        ]}
+      >
         <Image source={{ uri: anime.posterUrl }} style={styles.poster} resizeMode="cover" />
         {isFavorite && (
           <View style={styles.favBadge}>
@@ -148,8 +184,7 @@ export function SwipeCard({ anime, match, onSwiped, onTap, isTopCard, isFavorite
 }
 
 // Height cap: never taller than ~62% of the window, so the card can't
-// overflow up into the header on short browser windows. Phones are tall
-// enough that this cap never kicks in there.
+// overflow up into the header on short browser windows.
 const SCREEN_HEIGHT = Dimensions.get('window').height;
 const CARD_WIDTH_RAW = SCREEN_WIDTH * 0.9;
 const CARD_HEIGHT = Math.min(CARD_WIDTH_RAW * 1.45, SCREEN_HEIGHT * 0.62);

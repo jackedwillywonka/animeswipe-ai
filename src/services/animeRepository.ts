@@ -27,12 +27,14 @@ export async function fetchAnimeBatch(
     const fromApi = filtersActive(filters)
       ? await fetchFilteredAnime(filters!, excludeIds, limit, page)
       : await fetchPopularAnime(excludeIds, limit, page);
-    if (fromApi.length > 0) return fromApi;
+    return fromApi;
   } catch (e) {
-    console.warn('[animeRepository] AniList fetch failed, using local fallback', e);
+    // No mock fallback in production: fake anime were polluting real
+    // libraries during rate-limit windows. An empty batch is handled
+    // gracefully by the deck's empty-page guard.
+    console.warn('[animeRepository] AniList fetch failed', e);
+    return [];
   }
-  const mock = MOCK_ANIME.filter((a) => !excludeIds.includes(a.id)).slice(0, limit);
-  return mock;
 }
 
 export function getAnimeById(id: string): Anime | undefined {
@@ -41,9 +43,11 @@ export function getAnimeById(id: string): Anime | undefined {
 
 export async function getAnimeByIdAsync(id: string): Promise<Anime | undefined> {
   const cached = getCachedAnimeById(id) ?? getMockAnimeById(id);
-  if (cached) return cached;
+  // Self-healing: a cache entry without a poster was saved during a
+  // rate-limit window - refetch the real thing and overwrite it.
+  if (cached && cached.posterUrl) return cached;
   const fetched = await fetchAnimeById(id);
-  return fetched ?? undefined;
+  return fetched ?? cached ?? undefined;
 }
 
 export function getSimilarAnime(anime: Anime, limit = 6): Anime[] {
