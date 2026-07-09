@@ -17,6 +17,8 @@ import {
   type ChatMessage,
   type SessionMemory,
 } from '@/services/aiConversation';
+import { useAppContext } from '@/state/AppContext';
+import { getAnimeById } from '@/services/animeRepository';
 import type { Anime } from '@/types';
 
 interface AIChatScreenProps {
@@ -27,6 +29,7 @@ interface AIChatScreenProps {
 }
 
 export function AIChatScreen({ memory, onDeckReady, onClose, isSheet }: AIChatScreenProps) {
+  const { savedAnimeIds } = useAppContext();
   const [input, setInput] = useState('');
   const [isThinking, setIsThinking] = useState(false);
   const [keyboardHeight, setKeyboardHeight] = useState(0);
@@ -71,7 +74,11 @@ export function AIChatScreen({ memory, onDeckReady, onClose, isSheet }: AIChatSc
     forceRender((n) => n + 1); // show user's message immediately
 
     try {
-      const { deck } = await processUserMessage(memory, text);
+      // Resolve library titles from the local cache (no network needed)
+      const libraryTitles = Array.from(savedAnimeIds)
+        .map((id) => getAnimeById(id)?.title)
+        .filter((t): t is string => Boolean(t));
+      const { deck } = await processUserMessage(memory, text, libraryTitles);
       forceRender((n) => n + 1);
       if (deck.length > 0) {
         setTimeout(() => onDeckReady(deck), 900);

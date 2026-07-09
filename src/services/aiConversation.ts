@@ -151,17 +151,29 @@ interface BrainResponse {
   error?: string;
 }
 
-async function askRealBrain(memory: SessionMemory): Promise<BrainResponse | null> {
+async function askRealBrain(
+  memory: SessionMemory,
+  avoidTitles: string[] = []
+): Promise<BrainResponse | null> {
   try {
+    const messages = memory.messages.map((m) => ({
+      role: m.role,
+      content: m.text,
+    }));
+    // Tell the brain what's already in the user's library so it recommends
+    // around it - discovery means new-to-you, not repeats.
+    if (avoidTitles.length > 0) {
+      messages.push({
+        role: 'user',
+        content: `(System note: I already have these in my library, do NOT suggest them: ${avoidTitles
+          .slice(0, 120)
+          .join(', ')}. Suggest titles I have not seen instead.)`,
+      });
+    }
     const res = await fetch(AI_BRAIN_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        messages: memory.messages.map((m) => ({
-          role: m.role,
-          content: m.text,
-        })),
-      }),
+      body: JSON.stringify({ messages }),
     });
     if (!res.ok) return null;
     const data = (await res.json()) as BrainResponse;
@@ -179,7 +191,8 @@ export interface AiTurnResult {
 
 export async function processUserMessage(
   memory: SessionMemory,
-  userText: string
+  userText: string,
+  avoidTitles: string[] = []
 ): Promise<AiTurnResult> {
   if (!memory.seenIds) memory.seenIds = new Set();
   memory.messages.push({
@@ -194,8 +207,9 @@ export async function processUserMessage(
   await extractLikedTitles(userText, memory);
 
   // ---- REAL AI PATH ----
-  const brain = await askRealBrain(memory);
+  const brain = await askRealBrain(memory, avoidTitles);
   if (brain && brain.titles.length > 0) {
+    console.warn(`[ai] brain suggested ${brain.titles.length} titles`);
     const deck: Anime[] = [];
     const found = new Set<string>();
     // Look up each AI-suggested title on AniList (in small parallel batches)
@@ -216,6 +230,7 @@ export async function processUserMessage(
       }
     }
 
+    console.warn(`[ai] after AniList lookup + seen filtering: ${deck.length} cards`);
     if (deck.length > 0) {
       memory.lastDeckIds = deck.map((a) => a.id);
       memory.messages.push({
