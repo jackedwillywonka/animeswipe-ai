@@ -34,6 +34,12 @@ export function AIChatScreen({ memory, onDeckReady, onClose, isSheet }: AIChatSc
   const { savedAnimeIds, userId } = useAppContext();
   const [input, setInput] = useState('');
   const [isThinking, setIsThinking] = useState(false);
+  const [dotCount, setDotCount] = useState(1);
+  useEffect(() => {
+    if (!isThinking) return;
+    const id = setInterval(() => setDotCount((c) => (c % 3) + 1), 400);
+    return () => clearInterval(id);
+  }, [isThinking]);
   const [quota, setQuota] = useState<{ isPremium: boolean; usedToday: number } | null>(null);
   const [capped, setCapped] = useState(false);
   const [keyboardHeight, setKeyboardHeight] = useState(0);
@@ -201,7 +207,9 @@ export function AIChatScreen({ memory, onDeckReady, onClose, isSheet }: AIChatSc
           ListFooterComponent={
             isThinking ? (
               <View style={[styles.bubble, styles.aiBubble]}>
-                <Text style={styles.aiBubbleText}>Searching the anime universe…</Text>
+                <Text style={styles.aiBubbleText}>
+                  Searching the anime universe{'.'.repeat(dotCount)}
+                </Text>
               </View>
             ) : null
           }
