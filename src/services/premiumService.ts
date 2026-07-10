@@ -1,3 +1,5 @@
+import * as WebBrowser from 'expo-web-browser';
+import { Platform } from 'react-native';
 import { supabase } from './supabase';
 
 export const FREE_DAILY_AI_LIMIT = 3;
@@ -99,5 +101,32 @@ export async function getAiQuotaStatus(userId: string): Promise<AiQuotaResult> {
     };
   } catch {
     return fallback;
+  }
+}
+
+
+const CHECKOUT_URL =
+  'https://zhtnhuvngdvpdyufswco.supabase.co/functions/v1/create-checkout';
+
+/** Opens Stripe Checkout for the Premium subscription. */
+export async function startCheckout(userId: string): Promise<void> {
+  if (!userId) return;
+  try {
+    const returnUrl =
+      Platform.OS === 'web' ? window.location.origin : 'https://animeswipe-ai.vercel.app';
+    const res = await fetch(CHECKOUT_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId, returnUrl }),
+    });
+    const data = await res.json();
+    if (!data.url) { console.warn('[checkout] no url', data); return; }
+    if (Platform.OS === 'web') {
+      window.location.href = data.url;
+    } else {
+      await WebBrowser.openBrowserAsync(data.url);
+    }
+  } catch (e) {
+    console.warn('[checkout] failed', e);
   }
 }

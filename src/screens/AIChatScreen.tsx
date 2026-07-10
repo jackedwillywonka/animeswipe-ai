@@ -20,7 +20,7 @@ import {
 } from '@/services/aiConversation';
 import { useAppContext } from '@/state/AppContext';
 import { getAnimeById } from '@/services/animeRepository';
-import { consumeAiChat, getAiQuotaStatus, FREE_DAILY_AI_LIMIT } from '@/services/premiumService';
+import { consumeAiChat, getAiQuotaStatus, FREE_DAILY_AI_LIMIT, startCheckout } from '@/services/premiumService';
 import type { Anime } from '@/types';
 
 interface AIChatScreenProps {
@@ -215,7 +215,7 @@ export function AIChatScreen({ memory, onDeckReady, onClose, isSheet }: AIChatSc
             </Text>
             <Pressable
               style={styles.upgradeButton}
-              onPress={() => { /* Stripe checkout wired in a later step */ }}
+              onPress={() => startCheckout(userId)}
             >
               <Text style={styles.upgradeButtonText}>Upgrade to Premium</Text>
             </Pressable>
