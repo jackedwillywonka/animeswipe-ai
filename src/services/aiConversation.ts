@@ -1,4 +1,4 @@
-import { searchAnimeByText, fetchAnimeByGenres, fetchPopularAnime } from './anilistService';
+import { searchAnimeByText, fetchAnimeByGenres, fetchPopularAnime, fetchFranchiseInfo } from './anilistService';
 import type { Anime } from '@/types';
 
 /**
@@ -148,7 +148,53 @@ const AI_BRAIN_URL = 'https://zhtnhuvngdvpdyufswco.supabase.co/functions/v1/ai-b
 interface BrainResponse {
   reply: string;
   titles: string[];
+  constraints?: {
+    maxEpisodes: number | null;
+    minEpisodes: number | null;
+    episodeScope: 'season' | 'total';
+    minYear: number | null;
+    maxYear: number | null;
+    minRating: number | null;
+  };
   error?: string;
+}
+
+// Checks one anime against the brain-supplied numeric constraints.
+// Returns true if it should be KEPT. Uses this-season episode count by
+// default; only walks the franchise for a total when the user meant "total".
+async function passesConstraints(
+  anime: Anime,
+  c: NonNullable<BrainResponse['constraints']>
+): Promise<boolean> {
+  // Year
+  if (c.minYear != null && anime.releaseYear && anime.releaseYear < c.minYear) return false;
+  if (c.maxYear != null && anime.releaseYear && anime.releaseYear > c.maxYear) return false;
+  // Rating (out of 10)
+  if (c.minRating != null && anime.rating < c.minRating) return false;
+
+  // Episodes
+  if (c.maxEpisodes != null || c.minEpisodes != null) {
+    let epCount = anime.episodes;
+    // If the show is ongoing with no set count, use aired-so-far.
+    if ((!epCount || epCount === 0) && anime.nextAiring?.episode) {
+      epCount = anime.nextAiring.episode - 1;
+    }
+    if (c.episodeScope === 'total') {
+      // Walk the franchise for a true series-wide total.
+      try {
+        const fr = await fetchFranchiseInfo(anime.id);
+        if (fr && fr.totalEpisodes > 0) epCount = fr.totalEpisodes;
+      } catch {
+        // fall back to season count if the walk fails
+      }
+    }
+    if (epCount && epCount > 0) {
+      if (c.maxEpisodes != null && epCount > c.maxEpisodes) return false;
+      if (c.minEpisodes != null && epCount < c.minEpisodes) return false;
+    }
+    // If we genuinely don't know the count, keep it rather than wrongly drop it.
+  }
+  return true;
 }
 
 async function askRealBrain(
@@ -223,6 +269,11 @@ export async function processUserMessage(
       for (const r of results) {
         const a = r[0];
         if (a && !found.has(a.id) && !memory.seenIds.has(a.id)) {
+          // Enforce the brain's numeric constraints against real AniList data.
+          if (brain.constraints) {
+            const ok = await passesConstraints(a, brain.constraints);
+            if (!ok) continue;
+          }
           found.add(a.id);
           deck.push(a);
         }
