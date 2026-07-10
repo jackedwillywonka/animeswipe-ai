@@ -130,3 +130,30 @@ export async function startCheckout(userId: string): Promise<void> {
     console.warn('[checkout] failed', e);
   }
 }
+
+
+const PORTAL_URL =
+  'https://zhtnhuvngdvpdyufswco.supabase.co/functions/v1/customer-portal';
+
+/** Opens Stripe's Customer Portal so the user can manage/cancel their sub. */
+export async function openCustomerPortal(userId: string): Promise<void> {
+  if (!userId) return;
+  try {
+    const returnUrl =
+      Platform.OS === 'web' ? window.location.origin : 'https://animeswipe-ai.vercel.app';
+    const res = await fetch(PORTAL_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId, returnUrl }),
+    });
+    const data = await res.json();
+    if (!data.url) { console.warn('[portal] no url', data); return; }
+    if (Platform.OS === 'web') {
+      window.location.href = data.url;
+    } else {
+      await WebBrowser.openBrowserAsync(data.url);
+    }
+  } catch (e) {
+    console.warn('[portal] failed', e);
+  }
+}

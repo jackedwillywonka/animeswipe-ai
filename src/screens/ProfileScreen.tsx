@@ -5,6 +5,7 @@ import { colors, radius, spacing, typography } from '@/theme/tokens';
 import { useAppContext } from '@/state/AppContext';
 import { getAnimeByIdAsync } from '@/services/animeRepository';
 import { signOut } from '@/services/authService';
+import { openCustomerPortal, getAiQuotaStatus } from '@/services/premiumService';
 import { Pressable } from 'react-native';
 import { pickAndUploadAvatar, getAvatarUrl } from '@/services/avatarService';
 import type { UserStats } from '@/types';
@@ -22,6 +23,11 @@ export function ProfileScreen({ username }: ProfileScreenProps) {
 
   useEffect(() => {
     if (userId) getAvatarUrl(userId).then(setAvatarUrl);
+  }, [userId]);
+
+  const [isPremium, setIsPremium] = useState(false);
+  useEffect(() => {
+    if (userId) getAiQuotaStatus(userId).then((q) => setIsPremium(q.isPremium));
   }, [userId]);
 
   async function handleChangeAvatar() {
@@ -95,6 +101,15 @@ export function ProfileScreen({ username }: ProfileScreenProps) {
         >
           <Text style={styles.signOutText}>Sign Out</Text>
         </Pressable>
+
+        {isPremium && (
+          <Pressable
+            onPress={() => openCustomerPortal(userId)}
+            style={styles.manageButton}
+          >
+            <Text style={styles.manageText}>Manage Subscription</Text>
+          </Pressable>
+        )}
       </ScrollView>
     </SafeAreaView>
   );
@@ -176,6 +191,17 @@ const styles = StyleSheet.create({
     ...typography.display,
     color: colors.textPrimary,
     fontSize: 34,
+  },
+  manageButton: {
+    marginTop: spacing.md,
+    alignSelf: 'center',
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.sm,
+  },
+  manageText: {
+    ...typography.body,
+    color: colors.violetLight,
+    fontSize: 13,
   },
   signOutButton: {
     marginTop: spacing.xl,
