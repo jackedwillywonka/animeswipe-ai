@@ -1,11 +1,12 @@
 import React, { useEffect, useState } from 'react';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Image, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { colors, radius, spacing, typography } from '@/theme/tokens';
 import { useAppContext } from '@/state/AppContext';
 import { getAnimeByIdAsync } from '@/services/animeRepository';
 import { signOut } from '@/services/authService';
 import { Pressable } from 'react-native';
+import { pickAndUploadAvatar, getAvatarUrl } from '@/services/avatarService';
 import type { UserStats } from '@/types';
 
 interface ProfileScreenProps {
@@ -14,8 +15,22 @@ interface ProfileScreenProps {
 }
 
 export function ProfileScreen({ username }: ProfileScreenProps) {
-  const { statusById } = useAppContext();
+  const { statusById, userId } = useAppContext();
   const [episodesWatched, setEpisodesWatched] = useState(0);
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
+
+  useEffect(() => {
+    if (userId) getAvatarUrl(userId).then(setAvatarUrl);
+  }, [userId]);
+
+  async function handleChangeAvatar() {
+    if (!userId || uploadingAvatar) return;
+    setUploadingAvatar(true);
+    const url = await pickAndUploadAvatar(userId);
+    if (url) setAvatarUrl(url);
+    setUploadingAvatar(false);
+  }
 
   const completedIds = Object.keys(statusById).filter(
     (id) => statusById[id] === 'completed'
@@ -49,9 +64,18 @@ export function ProfileScreen({ username }: ProfileScreenProps) {
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.content}>
         <View style={styles.header}>
-          <View style={styles.avatar}>
-            <Text style={styles.avatarInitial}>{username.charAt(0).toUpperCase()}</Text>
-          </View>
+          <Pressable onPress={handleChangeAvatar} style={styles.avatar}>
+            {uploadingAvatar ? (
+              <ActivityIndicator color={colors.white} />
+            ) : avatarUrl ? (
+              <Image source={{ uri: avatarUrl }} style={styles.avatarImage} />
+            ) : (
+              <Text style={styles.avatarInitial}>{username.charAt(0).toUpperCase()}</Text>
+            )}
+          </Pressable>
+          <Pressable onPress={handleChangeAvatar}>
+            <Text style={styles.avatarHint}>Tap photo to change</Text>
+          </Pressable>
           <Text style={styles.username}>{username}</Text>
         </View>
 
@@ -90,6 +114,7 @@ const styles = StyleSheet.create({
     marginBottom: spacing.xl,
   },
   avatar: {
+    overflow: 'hidden',
     width: 88,
     height: 88,
     borderRadius: radius.pill,
@@ -97,6 +122,17 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: spacing.md,
+  },
+  avatarImage: {
+    width: '100%',
+    height: '100%',
+  },
+  avatarHint: {
+    ...typography.body,
+    color: colors.textTertiary,
+    fontSize: 12,
+    textAlign: 'center',
+    marginTop: spacing.xs,
   },
   avatarInitial: {
     ...typography.display,
