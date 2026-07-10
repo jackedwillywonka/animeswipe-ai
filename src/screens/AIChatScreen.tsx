@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import {
+  Alert,
   FlatList,
   Keyboard,
   Platform,
@@ -78,6 +79,35 @@ export function AIChatScreen({ memory, onDeckReady, onClose, isSheet }: AIChatSc
     }
   }, [memory]);
 
+  function doReset() {
+    // Wipe the conversation and its carried-over context, back to the greeting.
+    memory.messages = [];
+    memory.likedTitles = [];
+    memory.themes = new Set();
+    memory.genres = new Set();
+    memory.excludeGenres = new Set();
+    memory.lastDeckIds = [];
+    memory.messages.push({
+      id: `a-${Date.now()}`,
+      role: 'assistant',
+      text: GREETING,
+      timestamp: new Date().toISOString(),
+    });
+    setInput('');
+    forceRender((n) => n + 1);
+  }
+
+  function handleReset() {
+    Alert.alert(
+      'Start a new chat?',
+      'Are you sure you want to start a new conversation? Your current chat will be cleared.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'New Chat', style: 'destructive', onPress: doReset },
+      ]
+    );
+  }
+
   async function handleSend() {
     const text = input.trim();
     if (!text || isThinking) return;
@@ -132,6 +162,9 @@ export function AIChatScreen({ memory, onDeckReady, onClose, isSheet }: AIChatSc
               <Text style={styles.closeButtonText}>Back to swiping ↓</Text>
             </Pressable>
           )}
+          <Pressable onPress={handleReset} style={styles.resetButton}>
+            <Text style={styles.resetButtonText}>New chat</Text>
+          </Pressable>
         </View>
       )}
 
@@ -231,6 +264,18 @@ const styles = StyleSheet.create({
     borderRadius: radius.pill,
     backgroundColor: colors.surfaceElevated,
     marginBottom: spacing.sm,
+  },
+  resetButton: {
+    alignSelf: 'center',
+    paddingVertical: spacing.xs,
+    paddingHorizontal: spacing.md,
+    marginTop: spacing.xs,
+  },
+  resetButtonText: {
+    ...typography.bodyMedium,
+    color: colors.pass,
+    fontWeight: '700',
+    fontSize: 13,
   },
   closeButton: {
     paddingVertical: spacing.xs,
