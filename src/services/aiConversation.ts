@@ -1,4 +1,4 @@
-import { searchAnimeByText, fetchAnimeByGenres, fetchPopularAnime, fetchFranchiseInfo, fetchAnimeReviews } from './anilistService';
+import { searchAnimeByText, fetchAnimeByGenres, fetchPopularAnime, fetchFranchiseInfo } from './anilistService';
 import type { Anime } from '@/types';
 
 /**
@@ -236,34 +236,6 @@ export interface AiTurnResult {
   deck: Anime[];
 }
 
-// Detects review-style questions and extracts the anime title.
-function detectReviewQuestion(text: string): string | null {
-  const triggers = [
-    // "what did/do people/others/watchers think/say about/on/of X"
-    /what (?:did|do|are) (?:people|others|watchers|viewers|fans|some)?\s*(?:think|say|reviews?)?\s*(?:about|of|on|for)?\s+(.+)/i,
-    // "reviews/opinions/thoughts for/on/about/of X"  and "more reviews on X"
-    /(?:more\s+)?(?:reviews?|opinions?|thoughts?|takes?)\s+(?:for|on|about|of)\s+(.+)/i,
-    // "give me reviews (on/for/of) X"
-    /(?:give me|show me|get me|pull up)\s+(?:some\s+)?(?:more\s+)?(?:reviews?|opinions?|thoughts?)\s+(?:for|on|about|of)?\s*(.+)/i,
-    // "is/was X any good", "how is X received/rated"
-    /(?:is|was)\s+(.+?)\s+(?:any\s+)?good\s*\??$/i,
-    /how (?:is|was)\s+(.+?)\s+(?:received|rated|reviewed)/i,
-    /what(?:'s| is)\s+the\s+(?:consensus|verdict|reception)\s+(?:on|for|of)\s+(.+)/i,
-  ];
-  for (const re of triggers) {
-    const m = text.match(re);
-    if (m && m[1]) {
-      let title = m[1]
-        .replace(/[?.!]+$/, '')
-        .replace(/\b(the anime|anime|the show|show|series)\b/gi, '')
-        .replace(/\s+/g, ' ')
-        .trim();
-      if (title.length >= 2) return title;
-    }
-  }
-  return null;
-}
-
 export async function processUserMessage(
   memory: SessionMemory,
   userText: string,
@@ -281,36 +253,6 @@ export async function processUserMessage(
   // Still extract themes/titles locally - powers the details-page explanations
   extractThemes(userText, memory);
   await extractLikedTitles(userText, memory);
-
-  // ---- REVIEW-QUESTION DETECTION ----
-  // If the user is asking what people think of a specific anime, fetch real
-  // AniList reviews and summarize them instead of building a deck.
-  const reviewMatch = detectReviewQuestion(userText);
-  if (reviewMatch) {
-    const reviewData = await fetchAnimeReviews(reviewMatch).catch(() => null);
-    if (reviewData) {
-      try {
-        const res = await fetch(AI_BRAIN_URL, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ reviewMode: true, reviewData }),
-        });
-        const data = await res.json();
-        const summary = data.reviewSummary || `The community rates ${reviewData.title} ${reviewData.averageScore ?? 'n/a'}/100.`;
-        memory.messages.push({
-          id: `a-${Date.now()}`,
-          role: 'assistant',
-          text: summary,
-          timestamp: new Date().toISOString(),
-        });
-        // Also surface the anime card so they can add it to their library.
-        const card = await searchAnimeByText(reviewData.title, 1).catch(() => []);
-        return { reply: summary, deck: card[0] ? [card[0]] : [] };
-      } catch {
-        // fall through to normal deck logic if review summarization fails
-      }
-    }
-  }
 
   // ---- REAL AI PATH ----
   const brain = await askRealBrain(memory, avoidTitles, isPremium);
