@@ -199,7 +199,8 @@ async function passesConstraints(
 
 async function askRealBrain(
   memory: SessionMemory,
-  avoidTitles: string[] = []
+  avoidTitles: string[] = [],
+  isPremium: boolean = false
 ): Promise<BrainResponse | null> {
   try {
     const messages = memory.messages.map((m) => ({
@@ -219,7 +220,7 @@ async function askRealBrain(
     const res = await fetch(AI_BRAIN_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ messages }),
+      body: JSON.stringify({ messages, isPremium }),
     });
     if (!res.ok) return null;
     const data = (await res.json()) as BrainResponse;
@@ -238,7 +239,8 @@ export interface AiTurnResult {
 export async function processUserMessage(
   memory: SessionMemory,
   userText: string,
-  avoidTitles: string[] = []
+  avoidTitles: string[] = [],
+  isPremium: boolean = false
 ): Promise<AiTurnResult> {
   if (!memory.seenIds) memory.seenIds = new Set();
   memory.messages.push({
@@ -253,7 +255,7 @@ export async function processUserMessage(
   await extractLikedTitles(userText, memory);
 
   // ---- REAL AI PATH ----
-  const brain = await askRealBrain(memory, avoidTitles);
+  const brain = await askRealBrain(memory, avoidTitles, isPremium);
   if (brain && brain.titles.length > 0) {
     const deck: Anime[] = [];
     const found = new Set<string>();

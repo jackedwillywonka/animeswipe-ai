@@ -135,7 +135,7 @@ export function AIChatScreen({ memory, onDeckReady, onClose, isSheet }: AIChatSc
       const libraryTitles = Array.from(savedAnimeIds)
         .map((id) => getAnimeById(id)?.title)
         .filter((t): t is string => Boolean(t));
-      const { deck } = await processUserMessage(memory, text, libraryTitles);
+      const { deck } = await processUserMessage(memory, text, libraryTitles, quota?.isPremium ?? false);
       forceRender((n) => n + 1);
       if (deck.length > 0) {
         setTimeout(() => onDeckReady(deck), 900);
