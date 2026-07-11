@@ -236,21 +236,29 @@ export interface AiTurnResult {
   deck: Anime[];
 }
 
-// Detects "what did people think of X" style questions and extracts the title.
+// Detects review-style questions and extracts the anime title.
 function detectReviewQuestion(text: string): string | null {
-  const t = text.toLowerCase();
   const triggers = [
-    /what (?:did|do) (?:people|others|watchers|viewers|fans) (?:think|say) (?:about|of) (.+)/i,
-    /(?:reviews?|opinions?|thoughts?) (?:for|on|about) (.+)/i,
-    /(?:is|was) (.+?) (?:any )?good\??$/i,
-    /how (?:is|was) (.+?) (?:received|rated)\??/i,
-    /what(?:'s| is) the (?:consensus|verdict) on (.+)/i,
+    // "what did/do people/others/watchers think/say about/on/of X"
+    /what (?:did|do|are) (?:people|others|watchers|viewers|fans|some)?\s*(?:think|say|reviews?)?\s*(?:about|of|on|for)?\s+(.+)/i,
+    // "reviews/opinions/thoughts for/on/about/of X"  and "more reviews on X"
+    /(?:more\s+)?(?:reviews?|opinions?|thoughts?|takes?)\s+(?:for|on|about|of)\s+(.+)/i,
+    // "give me reviews (on/for/of) X"
+    /(?:give me|show me|get me|pull up)\s+(?:some\s+)?(?:more\s+)?(?:reviews?|opinions?|thoughts?)\s+(?:for|on|about|of)?\s*(.+)/i,
+    // "is/was X any good", "how is X received/rated"
+    /(?:is|was)\s+(.+?)\s+(?:any\s+)?good\s*\??$/i,
+    /how (?:is|was)\s+(.+?)\s+(?:received|rated|reviewed)/i,
+    /what(?:'s| is)\s+the\s+(?:consensus|verdict|reception)\s+(?:on|for|of)\s+(.+)/i,
   ];
   for (const re of triggers) {
     const m = text.match(re);
     if (m && m[1]) {
-      // Clean trailing punctuation/filler
-      return m[1].replace(/[?.!]+$/, '').replace(/\b(anime|the anime|show)\b/gi, '').trim();
+      let title = m[1]
+        .replace(/[?.!]+$/, '')
+        .replace(/\b(the anime|anime|the show|show|series)\b/gi, '')
+        .replace(/\s+/g, ' ')
+        .trim();
+      if (title.length >= 2) return title;
     }
   }
   return null;
