@@ -498,3 +498,52 @@ export function matchesFilters(anime: Anime, f: AppFilters): boolean {
   if (f.minScore > 0 && anime.rating < f.minScore) return false;
   return true;
 }
+
+
+// ---- REVIEWS (real watcher reviews from AniList) ----
+export interface AnimeReviewData {
+  title: string;
+  averageScore: number | null;
+  reviews: { summary: string; score: number | null; body: string }[];
+}
+
+/**
+ * Fetches real user reviews for an anime by title. Returns the top reviews
+ * (by rating/relevance) plus the community average score, so the AI can
+ * summarize genuine watcher sentiment instead of hallucinating.
+ */
+export async function fetchAnimeReviews(title: string): Promise<AnimeReviewData | null> {
+  const query = `
+    query ($search: String) {
+      Media(search: $search, type: ANIME) {
+        title { english romaji }
+        averageScore
+        reviews(sort: RATING_DESC, perPage: 6) {
+          nodes {
+            summary
+            score
+            body(asHtml: false)
+          }
+        }
+      }
+    }
+  `;
+  try {
+    const data = await gqlRequest<any>(query, { search: title });
+    const m = data?.Media;
+    if (!m) return null;
+    const nodes = m.reviews?.nodes ?? [];
+    return {
+      title: m.title?.english || m.title?.romaji || title,
+      averageScore: m.averageScore ?? null,
+      reviews: nodes.map((n: any) => ({
+        summary: n.summary ?? '',
+        score: n.score ?? null,
+        // Trim long review bodies so we don't blow up the AI prompt.
+        body: (n.body ?? '').slice(0, 1200),
+      })),
+    };
+  } catch {
+    return null;
+  }
+}

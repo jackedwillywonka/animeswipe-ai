@@ -55,10 +55,46 @@ Deno.serve(async (req) => {
       throw new Error("OPENAI_API_KEY is not configured");
     }
 
-    const { messages, isPremium } = await req.json();
+    const body = await req.json();
+    const { messages, isPremium } = body;
 
-    // Premium unlocks the smarter model with deeper anime knowledge.
-    const model = isPremium ? "gpt-4o" : "gpt-4o-mini";
+    // ---- REVIEW SUMMARY MODE ----
+    // When the app sends reviewMode + reviewData, summarize real AniList
+    // watcher reviews instead of building a deck.
+    if (body.reviewMode && body.reviewData) {
+      const rd = body.reviewData;
+      const reviewText = (rd.reviews || [])
+        .map((r: any, i: number) => `Review ${i + 1} (score ${r.score ?? "n/a"}/100): ${r.summary}\n${r.body}`)
+        .join("\n\n");
+      const reviewPrompt = `You are AnimeSwipe AI's anime expert friend. A user wants to know what real watchers thought of "${rd.title}" (community average score: ${rd.averageScore ?? "n/a"}/100).
+
+Here are real reviews from AniList watchers:
+
+${reviewText || "(No written reviews available for this title.)"}
+
+Write a warm, conversational 3-4 sentence summary of what watchers generally think - the praise, the common criticisms, and who'd enjoy it. Be honest (include negatives if reviewers mentioned them). Reference the average score naturally. Do NOT invent opinions not present in the reviews. If there are no reviews, say the community rates it [score] but there aren't many written reviews yet, and give a brief take based on the score. Reply as plain conversational text, NOT JSON.`;
+
+      const revRes = await fetch("https://api.openai.com/v1/chat/completions", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${OPENAI_API_KEY}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          model: "gpt-4o-mini",
+          temperature: 0.7,
+          messages: [{ role: "user", content: reviewPrompt }],
+        }),
+      });
+      const revData = await revRes.json();
+      const summary = revData.choices?.[0]?.message?.content ?? "I couldn't summarize the reviews right now.";
+      return new Response(
+        JSON.stringify({ reviewSummary: summary }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+
+    // gpt-4o-mini for everyone: great results, cheap to run. "Smarter" comes
+    // from better engineering (reviews, cross-referencing), not a pricier model.
+    const model = "gpt-4o-mini";
 
     const openaiRes = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
