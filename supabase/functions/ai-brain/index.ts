@@ -1,6 +1,8 @@
-// AnimeSwipe AI brain - runs on Supabase Edge Functions.
-// Premium users get gpt-4o (deeper anime knowledge, hidden gems);
-// free users get gpt-4o-mini.
+// AnimeSwipe AI brain - the intent interpreter.
+// It does NOT just list anime from memory. It reads what the user wants
+// (data-driven OR emotional) and outputs (a) a QUERY SPEC the app runs
+// against AniList's full catalog, plus (b) a few specific standout picks.
+// AniList's real data produces diverse results from 20,000+ titles.
 
 const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY");
 
@@ -10,40 +12,42 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type",
 };
 
-const SYSTEM_PROMPT = `You are the recommendation brain of AnimeSwipe AI, a Tinder-style anime discovery app. You have deep knowledge of anime: power systems, character archetypes, pacing, tone, studios, story structure.
+const SYSTEM_PROMPT = `You are the recommendation brain of AnimeSwipe AI. Your job is to translate what a user wants into a precise AniList database query, so results come from AniList's full catalog of 20,000+ anime using REAL data - not just famous titles from memory. Every request, whether data-driven ("underrated anime before 2020") or emotional ("I loved Attack on Titan, give me that feeling"), must be turned into concrete AniList query parameters.
 
-The user describes what they want in natural language. You reply with JSON ONLY (no markdown, no backticks) in exactly this shape:
+Reply with JSON ONLY (no markdown/backticks):
 {
-  "reply": "short friendly conversational response (1-2 sentences, reference specifics they mentioned)",
-  "titles": ["Exact Anime Title 1", "Exact Anime Title 2", ...],
-  "constraints": {
-    "maxEpisodes": number or null,
-    "minEpisodes": number or null,
-    "episodeScope": "season" or "total",
+  "reply": "warm 1-2 sentence response referencing what they said",
+  "query": {
+    "genres": [array of AniList genres] or [],
+    "tags": [array of AniList tags] or [],
+    "minScore": number 0-100 or null,
+    "maxPopularity": number or null,
     "minYear": number or null,
     "maxYear": number or null,
-    "minRating": number or null
+    "format": "any" | "tv" | "movie",
+    "sort": "SCORE_DESC" | "POPULARITY_DESC" | "TRENDING_DESC" | "FAVOURITES_DESC"
+  },
+  "titles": [up to 8 specific standout anime titles you personally recommend for this request, exact AniList/MAL names],
+  "constraints": {
+    "maxEpisodes": number or null, "minEpisodes": number or null,
+    "episodeScope": "season" or "total",
+    "minYear": number or null, "maxYear": number or null, "minRating": number or null
   }
 }
 
-Rules for "titles":
-- 25 to 35 anime, ordered best-match first
-- Use exact official English or romaji titles as found on AniList/MyAnimeList so they can be looked up
-- Match the MEANING of the request: if they loved Black Clover's underdog-with-no-powers arc, prioritize shows with earned power growth and found-family, not just any action show
-- Distinguish nuance: "Baki strong" (no powers, raw strength) differs from "Asta strong" (magic system, starts weak)
-- Respect exclusions ("no romance", "less filler")
-- Consider the full conversation history for refinements: keep roughly a third of prior suggestions that still fit and introduce fresh ones
-- When the user asks for underrated / hidden gems / lesser-known anime, prioritize genuinely acclaimed but LESS mainstream titles over the obvious popular hits - dig into the deep catalog
-- Never include hentai/adult titles
-- Do not include the shows the user says they already watched (recommend adjacent ones instead)
+HOW TO BUILD THE QUERY:
+- AniList GENRES (use exact): Action, Adventure, Comedy, Drama, Ecchi, Fantasy, Horror, Mahou Shoujo, Mecha, Music, Mystery, Psychological, Romance, Sci-Fi, Slice of Life, Sports, Supernatural, Thriller
+- AniList TAGS are rich and specific (use them to capture NUANCE and EMOTION): e.g. Tragedy, Coming of Age, Military, Revenge, Dark Fantasy, Time Manipulation, Anti-Hero, Found Family, Gore, Post-Apocalyptic, Survival, Love Triangle, Tear Jerker, Philosophy, Cyberpunk, Martial Arts, Super Power, Death Game, Isekai, School, Historical, Detective, Psychological Horror, Coming of Age. Pick tags that match the FEELING, not just the surface.
 
-Rules for "constraints" - extract any hard numeric limits the user states, so the app can enforce them against real data:
-- maxEpisodes / minEpisodes: episode count limits (e.g. "under 100 episodes" -> maxEpisodes 100). null if not mentioned.
-- episodeScope: "season" if they mean a single season (the DEFAULT when ambiguous), or "total" if they clearly mean the whole franchise.
-- minYear / maxYear: release-year limits. null if not mentioned.
-- minRating: minimum score out of 10 ("rated 8+" -> minRating 8). "highly rated" is NOT a number, leave null.
-- CRITICAL: Read the FULL conversation. If the user CORRECTS an earlier constraint, output their LATEST intent, overriding what they said before.
-- If no numeric constraints are mentioned, output all nulls with episodeScope "season".`;
+- DATA REQUESTS: "underrated / hidden gem / lesser-known" -> set maxPopularity around 40000-70000 AND minScore around 70+, sort SCORE_DESC (high quality, low popularity = genuinely underrated by real numbers). "most popular" -> sort POPULARITY_DESC. "best" -> sort SCORE_DESC, minScore 75. "trending / new" -> sort TRENDING_DESC.
+- EMOTIONAL / COMPARISON REQUESTS: "I loved Attack on Titan" -> derive what made it resonate (dark, high-stakes, tragedy, military, plot-twists, survival) into genres [Action, Drama, Fantasy] + tags [Tragedy, Military, Survival, Dark Fantasy], minScore 70, sort SCORE_DESC. "something to make me cry" -> tags [Tragedy, Tear Jerker, Coming of Age], genres [Drama], sort SCORE_DESC. "chill / relaxing" -> genres [Slice of Life], tags [Iyashikei, Coming of Age], sort SCORE_DESC.
+- Always set minScore to at least 65 unless the user wants "so bad it's good" - we want quality results.
+- Respect year/episode/rating limits the user states (also mirror them in "constraints").
+- format: "movie" only if they clearly want movies; "tv" for series; else "any".
+
+"titles": ALSO give up to 8 specific hand-picked standouts that fit - your personal expert picks. These blend with the query results. Prefer less obvious picks over the same famous few.
+
+Never suggest hentai/adult titles. Don't recommend titles the user says they've already seen.`;
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -51,17 +55,9 @@ Deno.serve(async (req) => {
   }
 
   try {
-    if (!OPENAI_API_KEY) {
-      throw new Error("OPENAI_API_KEY is not configured");
-    }
+    if (!OPENAI_API_KEY) throw new Error("OPENAI_API_KEY is not configured");
 
-    const { messages, isPremium } = await req.json();
-
-
-
-    // gpt-4o-mini for everyone: great results, cheap to run. "Smarter" comes
-    // from better engineering (reviews, cross-referencing), not a pricier model.
-    const model = "gpt-4o-mini";
+    const { messages } = await req.json();
 
     const openaiRes = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
@@ -70,7 +66,7 @@ Deno.serve(async (req) => {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model,
+        model: "gpt-4o-mini",
         temperature: 0.7,
         response_format: { type: "json_object" },
         messages: [
@@ -89,6 +85,19 @@ Deno.serve(async (req) => {
     const content = data.choices?.[0]?.message?.content ?? "{}";
     const parsed = JSON.parse(content);
 
+    const q = parsed.query ?? {};
+    const query = {
+      genres: Array.isArray(q.genres) ? q.genres : [],
+      tags: Array.isArray(q.tags) ? q.tags : [],
+      minScore: typeof q.minScore === "number" ? q.minScore : null,
+      maxPopularity: typeof q.maxPopularity === "number" ? q.maxPopularity : null,
+      minYear: typeof q.minYear === "number" ? q.minYear : null,
+      maxYear: typeof q.maxYear === "number" ? q.maxYear : null,
+      format: ["any", "tv", "movie"].includes(q.format) ? q.format : "any",
+      sort: ["SCORE_DESC", "POPULARITY_DESC", "TRENDING_DESC", "FAVOURITES_DESC"].includes(q.sort)
+        ? q.sort : "SCORE_DESC",
+    };
+
     const c = parsed.constraints ?? {};
     const constraints = {
       maxEpisodes: typeof c.maxEpisodes === "number" ? c.maxEpisodes : null,
@@ -102,9 +111,9 @@ Deno.serve(async (req) => {
     return new Response(
       JSON.stringify({
         reply: parsed.reply ?? "Here's what I found!",
-        titles: Array.isArray(parsed.titles) ? parsed.titles.slice(0, 35) : [],
+        query,
+        titles: Array.isArray(parsed.titles) ? parsed.titles.slice(0, 8) : [],
         constraints,
-        model, // for debugging - shows which model answered
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );

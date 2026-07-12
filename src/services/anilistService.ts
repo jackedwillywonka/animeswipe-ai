@@ -547,3 +547,76 @@ export async function fetchAnimeReviews(title: string): Promise<AnimeReviewData 
     return null;
   }
 }
+
+
+// ---- QUERY-SPEC SEARCH (the AI's data-driven discovery) ----
+export interface AnimeQuerySpec {
+  genres: string[];
+  tags: string[];
+  minScore: number | null;
+  maxPopularity: number | null;
+  minYear: number | null;
+  maxYear: number | null;
+  format: 'any' | 'tv' | 'movie';
+  sort: 'SCORE_DESC' | 'POPULARITY_DESC' | 'TRENDING_DESC' | 'FAVOURITES_DESC';
+}
+
+/**
+ * Runs ONE rich AniList query from the AI's derived spec. This is what lets
+ * results come from AniList's full 20,000+ catalog by REAL data (score,
+ * popularity, tags, year) instead of the AI listing titles from memory.
+ */
+export async function fetchAnimeByQuery(
+  spec: AnimeQuerySpec,
+  excludeIds: string[] = [],
+  perPage = 50
+): Promise<Anime[]> {
+  const query = `
+    query (
+      $genres: [String], $tags: [String], $minScore: Int,
+      $maxPopularity: Int, $startGreater: FuzzyDateInt, $startLesser: FuzzyDateInt,
+      $format: MediaFormat, $sort: [MediaSort], $perPage: Int
+    ) {
+      Page(page: 1, perPage: $perPage) {
+        media(
+          type: ANIME,
+          isAdult: false,
+          genre_in: $genres,
+          tag_in: $tags,
+          averageScore_greater: $minScore,
+          popularity_lesser: $maxPopularity,
+          startDate_greater: $startGreater,
+          startDate_lesser: $startLesser,
+          format: $format,
+          sort: $sort
+        ) {
+          ${MEDIA_FIELDS}
+        }
+      }
+    }
+  `;
+
+  const variables: Record<string, unknown> = {
+    perPage,
+    sort: [spec.sort],
+  };
+  if (spec.genres.length > 0) variables.genres = spec.genres;
+  if (spec.tags.length > 0) variables.tags = spec.tags;
+  if (spec.minScore != null) variables.minScore = spec.minScore;
+  if (spec.maxPopularity != null) variables.maxPopularity = spec.maxPopularity;
+  // AniList FuzzyDateInt format: YYYYMMDD
+  if (spec.minYear != null) variables.startGreater = spec.minYear * 10000;
+  if (spec.maxYear != null) variables.startLesser = (spec.maxYear + 1) * 10000;
+  if (spec.format === 'tv') variables.format = 'TV';
+  if (spec.format === 'movie') variables.format = 'MOVIE';
+
+  try {
+    const data = await gqlRequest<any>(query, variables);
+    const list: Anime[] = (data?.Page?.media ?? []).map(mapMedia);
+    const exclude = new Set(excludeIds);
+    return list.filter((a) => !exclude.has(a.id));
+  } catch (e) {
+    console.warn('[anilist] query-spec search failed', e);
+    return [];
+  }
+}

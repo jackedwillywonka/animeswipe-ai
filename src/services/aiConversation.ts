@@ -1,4 +1,5 @@
-import { searchAnimeByText, fetchAnimeByGenres, fetchPopularAnime, fetchFranchiseInfo } from './anilistService';
+import { searchAnimeByText, fetchAnimeByGenres, fetchPopularAnime, fetchFranchiseInfo, fetchAnimeByQuery } from './anilistService';
+import type { AnimeQuerySpec } from './anilistService';
 import type { Anime } from '@/types';
 
 /**
@@ -148,6 +149,7 @@ const AI_BRAIN_URL = 'https://zhtnhuvngdvpdyufswco.supabase.co/functions/v1/ai-b
 interface BrainResponse {
   reply: string;
   titles: string[];
+  query?: AnimeQuerySpec;
   constraints?: {
     maxEpisodes: number | null;
     minEpisodes: number | null;
@@ -254,33 +256,52 @@ export async function processUserMessage(
   extractThemes(userText, memory);
   await extractLikedTitles(userText, memory);
 
-  // ---- REAL AI PATH ----
+  // ---- REAL AI PATH (query-driven: AniList's full catalog by real data) ----
   const brain = await askRealBrain(memory, avoidTitles, isPremium);
-  if (brain && brain.titles.length > 0) {
+  if (brain && (brain.query || brain.titles.length > 0)) {
     const deck: Anime[] = [];
     const found = new Set<string>();
-    // Look up each AI-suggested title on AniList (in small parallel batches)
-    const batchSize = 3;
-    for (let i = 0; i < brain.titles.length; i += batchSize) {
-      const batch = brain.titles.slice(i, i + batchSize);
-      const results = await Promise.all(
-        batch.map((t) => searchAnimeByText(t, 1).catch(() => []))
-      );
-      // brief pause between batches to stay under AniList rate limits
-      await new Promise((r) => setTimeout(r, 700));
-      for (const r of results) {
-        const a = r[0];
-        if (a && !found.has(a.id) && !memory.seenIds.has(a.id)) {
-          // Enforce the brain's numeric constraints against real AniList data.
-          if (brain.constraints) {
-            const ok = await passesConstraints(a, brain.constraints);
-            if (!ok) continue;
+    const seenArrForQuery = Array.from(memory.seenIds);
+
+    // (a) The AI's hand-picked standouts go FIRST (its expert taste).
+    if (brain.titles.length > 0) {
+      const batchSize = 3;
+      for (let i = 0; i < brain.titles.length; i += batchSize) {
+        const batch = brain.titles.slice(i, i + batchSize);
+        const results = await Promise.all(
+          batch.map((t) => searchAnimeByText(t, 1).catch(() => []))
+        );
+        await new Promise((r) => setTimeout(r, 500));
+        for (const r of results) {
+          const a = r[0];
+          if (a && !found.has(a.id) && !memory.seenIds.has(a.id)) {
+            if (brain.constraints) {
+              const ok = await passesConstraints(a, brain.constraints);
+              if (!ok) continue;
+            }
+            found.add(a.id);
+            deck.push(a);
           }
-          found.add(a.id);
-          deck.push(a);
         }
       }
     }
+
+    // (b) The QUERY pulls dozens of real matches from AniList's whole catalog.
+    if (brain.query) {
+      const queryResults = await fetchAnimeByQuery(brain.query, seenArrForQuery, 50).catch(() => []);
+      for (const a of queryResults) {
+        if (found.has(a.id) || memory.seenIds.has(a.id)) continue;
+        if (brain.constraints) {
+          const ok = await passesConstraints(a, brain.constraints);
+          if (!ok) continue;
+        }
+        found.add(a.id);
+        deck.push(a);
+      }
+    }
+
+    console.warn(`[ai] deck built: ${deck.length} cards (${brain.titles.length} handpicked + query)`);
+
     if (deck.length > 0) {
       memory.lastDeckIds = deck.map((a) => a.id);
       memory.messages.push({
