@@ -267,7 +267,17 @@ export async function fetchAnimeById(id: string): Promise<Anime | null> {
 
 
 // ---- FRANCHISE INFO (season position + totals across the whole series) ----
+export interface FranchiseSeason {
+  id: string;
+  title: string;
+  posterUrl: string;
+  episodes: number;
+  year: number | null;
+  seasonNumber: number;
+}
+
 export interface FranchiseInfo {
+  seasons?: FranchiseSeason[];
   seasonNumber: number;
   totalSeasons: number;
   totalEpisodes: number;
@@ -295,6 +305,9 @@ const RELATION_QUERY = `
     Media(id: $id, type: ANIME) {
       id
       episodes
+      title { english romaji }
+      coverImage { extraLarge large }
+      startDate { year }
       nextAiringEpisode { episode }
       relations {
         edges {
@@ -312,6 +325,9 @@ interface ChainNode {
   isOngoing: boolean;
   prequelId: number | null;
   sequelId: number | null;
+  title: string;
+  posterUrl: string;
+  year: number | null;
 }
 
 async function fetchChainNode(id: number): Promise<ChainNode | null> {
@@ -338,6 +354,9 @@ async function fetchChainNode(id: number): Promise<ChainNode | null> {
       isOngoing: m.episodes == null,
       prequelId: findRel('PREQUEL'),
       sequelId: findRel('SEQUEL'),
+      title: m.title?.english || m.title?.romaji || 'Unknown',
+      posterUrl: m.coverImage?.extraLarge || m.coverImage?.large || '',
+      year: m.startDate?.year ?? null,
     };
   } catch {
     return null;
@@ -388,8 +407,18 @@ export async function fetchFranchiseInfo(id: string): Promise<FranchiseInfo | nu
   // a summed total would be misleading.
   const hasOngoing = chain.some((c) => c.isOngoing);
   // Cache the result for every season in the chain (one walk serves them all)
+  // Build the full season list once - every season in the franchise.
+  const seasons: FranchiseSeason[] = chain.map((c, i) => ({
+    id: String(c.id),
+    title: c.title,
+    posterUrl: c.posterUrl,
+    episodes: c.episodes,
+    year: c.year,
+    seasonNumber: i + 1,
+  }));
   chain.forEach((c, i) => {
     franchiseCache.set(String(c.id), {
+      seasons,
       seasonNumber: i + 1,
       totalSeasons: chain.length,
       totalEpisodes,

@@ -18,6 +18,7 @@ import { fetchFranchiseInfo, type FranchiseInfo } from '@/services/anilistServic
 import type { Anime, MatchResult, UserPreferences } from '@/types';
 
 interface AnimeDetailsScreenProps {
+  onViewSeasons?: (seasons: any[], franchiseTitle: string) => void;
   anime: Anime;
   match?: MatchResult;
   preferences: UserPreferences;
@@ -42,6 +43,7 @@ const FORMAT_LABELS: Record<string, string> = {
 
 export function AnimeDetailsScreen({
   anime: animeProp,
+  onViewSeasons,
   match,
   preferences,
   onBack,
@@ -145,6 +147,17 @@ export function AnimeDetailsScreen({
             <Text style={styles.metaDot}>·</Text>
             <Text style={styles.metaText}>{anime.releaseYear}</Text>
           </View>
+
+          {franchise && franchise.totalSeasons > 1 && franchise.seasons && onViewSeasons && (
+            <Pressable
+              style={styles.seasonsButton}
+              onPress={() => onViewSeasons(franchise.seasons!, anime.title)}
+            >
+              <Text style={styles.seasonsButtonText}>
+                📚  View all {franchise.totalSeasons} seasons
+              </Text>
+            </Pressable>
+          )}
 
           {franchise && !(anime.format && FORMAT_LABELS[anime.format]) && (
             <Text style={styles.franchiseText}>
@@ -403,6 +416,22 @@ const styles = StyleSheet.create({
   metaDot: {
     color: colors.textTertiary,
     marginHorizontal: spacing.xs,
+  },
+  seasonsButton: {
+    alignSelf: 'flex-start',
+    backgroundColor: colors.violetDeep,
+    borderWidth: 1,
+    borderColor: colors.violetCore,
+    borderRadius: radius.pill,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    marginTop: spacing.sm,
+    marginBottom: spacing.xs,
+  },
+  seasonsButtonText: {
+    ...typography.bodyMedium,
+    color: colors.violetLight,
+    fontSize: 14,
   },
   franchiseText: {
     ...typography.bodyMedium,

@@ -5,6 +5,7 @@ import { LoginScreen } from '@/screens/LoginScreen';
 import { WelcomeScreen } from '@/screens/WelcomeScreen';
 import { AIChatScreen } from '@/screens/AIChatScreen';
 import { AnimeDetailsScreen } from '@/screens/AnimeDetailsScreen';
+import { SeasonsScreen } from '@/screens/SeasonsScreen';
 import { FilterScreen } from '@/screens/FilterScreen';
 import { MainTabs } from './MainTabs';
 import { colors } from '@/theme/tokens';
@@ -20,6 +21,7 @@ export type RootStackParamList = {
   AIChat: undefined;
   Main: undefined;
   Details: { animeId: string };
+  Seasons: { seasons: any[]; franchiseTitle: string };
   Filters: undefined;
 };
 
@@ -99,6 +101,9 @@ export function RootNavigator({
                 match.aiExplanation = explainFromMemory(memory, anime);
                 return (
                   <AnimeDetailsScreen
+                    onViewSeasons={(seasons, franchiseTitle) =>
+                      navigation.navigate('Seasons', { seasons, franchiseTitle })
+                    }
                     anime={anime}
                     match={match}
                     preferences={preferences}
@@ -115,6 +120,18 @@ export function RootNavigator({
                   />
                 );
               }}
+            </Stack.Screen>
+            <Stack.Screen name="Seasons">
+              {({ navigation, route }: any) => (
+                <SeasonsScreen
+                  franchiseTitle={route.params.franchiseTitle}
+                  seasons={route.params.seasons}
+                  onBack={() => navigation.goBack()}
+                  onSelectSeason={(seasonId) =>
+                    navigation.push('Details', { animeId: seasonId })
+                  }
+                />
+              )}
             </Stack.Screen>
             <Stack.Screen name="Filters" options={{ presentation: 'modal' }}>
               {({ navigation }) => (
