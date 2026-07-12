@@ -21,7 +21,7 @@ export function SwipeScreen() {
   const { memory, aiDeck, setAiDeck } = useAiSession();
   const [chatOpen, setChatOpen] = useState(false);
 
-  const { deck, currentAnime, currentMatch, isLoading, error, swipe } = useSwipeDeck(
+  const { deck, currentAnime, currentMatch, isLoading, error, swipe, loadMore } = useSwipeDeck(
     userId,
     preferences,
     recordLocalSwipe,
@@ -103,7 +103,13 @@ export function SwipeScreen() {
         {!error && !isLoading && deck.length === 0 && (
           <View style={styles.emptyState}>
             <Text style={styles.emptyText}>
-              You made it through the whole deck! Tap the AI below for a fresh batch.
+              You made it through the whole deck! 🎉
+            </Text>
+            <Pressable style={styles.loadMoreButton} onPress={() => loadMore(true)}>
+              <Text style={styles.loadMoreText}>🔄  Load more anime</Text>
+            </Pressable>
+            <Text style={styles.emptyHint}>
+              or tap "Ask the AI" below for something fresh
             </Text>
           </View>
         )}
@@ -206,6 +212,25 @@ const styles = StyleSheet.create({
   },
   actionsArea: {
     paddingBottom: spacing.sm,
+  },
+  loadMoreButton: {
+    backgroundColor: colors.violetCore,
+    borderRadius: radius.pill,
+    paddingHorizontal: spacing.xl,
+    paddingVertical: spacing.md,
+    marginTop: spacing.lg,
+  },
+  loadMoreText: {
+    ...typography.bodyMedium,
+    color: colors.white,
+    fontSize: 15,
+  },
+  emptyHint: {
+    ...typography.body,
+    color: colors.textTertiary,
+    fontSize: 13,
+    marginTop: spacing.md,
+    textAlign: 'center',
   },
   emptyState: {
     paddingHorizontal: spacing.xl,

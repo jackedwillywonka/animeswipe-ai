@@ -58,10 +58,12 @@ export function useSwipeDeck(
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [aiDeck]);
 
-  const loadMore = useCallback(async () => {
-    // Don't auto-refill an AI deck - the user refines via chat instead.
+  const loadMore = useCallback(async (force = false) => {
+    // Don't AUTO-refill an AI deck - but the end-of-deck button can force it,
+    // which returns the user to regular (filtered/popular) discovery.
     if (lastAiDeckRef.current) {
-      return;
+      if (!force) return;
+      lastAiDeckRef.current = null;
     }
     if (outOfAnimeRef.current) {
       setIsLoading(false);
@@ -164,5 +166,5 @@ export function useSwipeDeck(
     [currentAnime, weights]
   );
 
-  return { deck, currentAnime, currentMatch, isLoading, error, swipe };
+  return { deck, currentAnime, currentMatch, isLoading, error, swipe, loadMore };
 }
