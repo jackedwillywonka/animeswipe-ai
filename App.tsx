@@ -10,6 +10,7 @@ import { useFonts as useInter, Inter_400Regular, Inter_500Medium } from '@expo-g
 import type { Session } from '@supabase/supabase-js';
 import { SplashScreen } from '@/screens/SplashScreen';
 import { EmailAuthScreen } from '@/screens/EmailAuthScreen';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { RootNavigator } from '@/navigation/RootNavigator';
 import { AppProvider } from '@/state/AppContext';
 import { AiSessionProvider } from '@/state/AiSessionContext';
@@ -43,10 +44,12 @@ function AppInner() {
 
   if (emailAuthOpen && !session) {
     return (
-      <EmailAuthScreen
-        onBack={() => setEmailAuthOpen(false)}
-        onAuthenticated={() => setEmailAuthOpen(false)}
-      />
+      <SafeAreaProvider>
+        <EmailAuthScreen
+          onBack={() => setEmailAuthOpen(false)}
+          onAuthenticated={() => setEmailAuthOpen(false)}
+        />
+      </SafeAreaProvider>
     );
   }
 
