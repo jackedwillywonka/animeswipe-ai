@@ -288,7 +288,17 @@ export async function processUserMessage(
 
     // (b) The QUERY pulls dozens of real matches from AniList's whole catalog.
     if (brain.query) {
-      const queryResults = await fetchAnimeByQuery(brain.query, seenArrForQuery, 50).catch(() => []);
+      let queryResults = await fetchAnimeByQuery(brain.query, seenArrForQuery, 50).catch(() => []);
+      // If the filters were too tight (common with movies + niche combos),
+      // retry progressively looser rather than showing the user nothing.
+      if (queryResults.length === 0) {
+        const looser = { ...brain.query, maxPopularity: null };
+        queryResults = await fetchAnimeByQuery(looser, seenArrForQuery, 50).catch(() => []);
+      }
+      if (queryResults.length === 0) {
+        const looser2 = { ...brain.query, maxPopularity: null, tags: [], minScore: null };
+        queryResults = await fetchAnimeByQuery(looser2, seenArrForQuery, 50).catch(() => []);
+      }
       for (const a of queryResults) {
         if (found.has(a.id) || memory.seenIds.has(a.id)) continue;
         if (brain.constraints) {
@@ -337,7 +347,10 @@ export async function processUserMessage(
   }
 
   memory.lastDeckIds = deck.map((a) => a.id);
-  const reply = `Here are ${deck.length} picks! (I had trouble reaching my full brain just now, so these are broader matches - try again in a moment for sharper ones.)`;
+  const reply =
+    deck.length === 0
+      ? `Hmm, I couldn't find matches for that exact combo — it might be too specific. Try loosening it up a bit, or describe the vibe you're after and I'll dig again!`
+      : `Here are ${deck.length} picks based on what you're after!`;
   memory.messages.push({
     id: `a-${Date.now()}`,
     role: 'assistant',
