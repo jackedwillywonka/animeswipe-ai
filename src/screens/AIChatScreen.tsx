@@ -104,6 +104,14 @@ export function AIChatScreen({ memory, onDeckReady, onClose, isSheet }: AIChatSc
   }
 
   function handleReset() {
+    // Alert.alert is native-only - browsers need window.confirm.
+    if (Platform.OS === 'web') {
+      const ok = window.confirm(
+        'Start a new chat? Your current conversation will be cleared.'
+      );
+      if (ok) doReset();
+      return;
+    }
     Alert.alert(
       'Start a new chat?',
       'Are you sure you want to start a new conversation? Your current chat will be cleared.',
