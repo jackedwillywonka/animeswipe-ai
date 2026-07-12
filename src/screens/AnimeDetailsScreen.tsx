@@ -248,23 +248,42 @@ export function AnimeDetailsScreen({
               style={styles.tiktokButton}
               onPress={async () => {
                 const q = encodeURIComponent(anime.title + ' edit');
-                // Hashtag slug: "Black Clover" -> "blackcloveredit"
-                const tag = anime.title.toLowerCase().replace(/[^a-z0-9]/g, '') + 'edit';
+                // Search URL lands on video results (and hands off to the
+                // TikTok app on phones, which is where most users are).
+                const searchUrl = `https://www.tiktok.com/search?q=${q}`;
                 if (Platform.OS === 'web') {
-                  // No app schemes in browsers - hashtag pages render publicly
-                  Linking.openURL(`https://www.tiktok.com/tag/${tag}`);
+                  Linking.openURL(searchUrl);
                   return;
                 }
                 try {
-                  // TikTok's internal scheme - honors search keywords
                   await Linking.openURL(`snssdk1233://search?keyword=${q}`);
                 } catch {
-                  // Fall back to the hashtag page (reliably opens in the app)
-                  Linking.openURL(`https://www.tiktok.com/tag/${tag}`);
+                  Linking.openURL(searchUrl);
                 }
               }}
             >
               <Text style={styles.tiktokButtonText}>🎬 Watch {anime.title} edits on TikTok</Text>
+            </Pressable>
+          </Section>
+
+          <Section title="Reviews">
+            <Pressable
+              style={styles.tiktokButton}
+              onPress={async () => {
+                const q = encodeURIComponent(anime.title + ' anime review');
+                const searchUrl = `https://www.tiktok.com/search?q=${q}`;
+                if (Platform.OS === 'web') {
+                  Linking.openURL(searchUrl);
+                  return;
+                }
+                try {
+                  await Linking.openURL(`snssdk1233://search?keyword=${q}`);
+                } catch {
+                  Linking.openURL(searchUrl);
+                }
+              }}
+            >
+              <Text style={styles.tiktokButtonText}>⭐ Watch {anime.title} reviews on TikTok</Text>
             </Pressable>
           </Section>
 

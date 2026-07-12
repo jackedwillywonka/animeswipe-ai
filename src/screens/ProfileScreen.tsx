@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, Image, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Image, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { colors, radius, spacing, typography } from '@/theme/tokens';
 import { useAppContext } from '@/state/AppContext';
@@ -8,6 +8,7 @@ import { signOut } from '@/services/authService';
 import { openCustomerPortal, getAiQuotaStatus } from '@/services/premiumService';
 import { Pressable } from 'react-native';
 import { pickAndUploadAvatar, getAvatarUrl } from '@/services/avatarService';
+import { getUsername, setUsername as saveUsername } from '@/services/usernameService';
 import type { UserStats } from '@/types';
 
 interface ProfileScreenProps {
@@ -24,6 +25,31 @@ export function ProfileScreen({ username }: ProfileScreenProps) {
   useEffect(() => {
     if (userId) getAvatarUrl(userId).then(setAvatarUrl);
   }, [userId]);
+
+  const [myUsername, setMyUsername] = useState<string | null>(null);
+  const [usernameInput, setUsernameInput] = useState('');
+  const [usernameError, setUsernameError] = useState<string | null>(null);
+  const [savingUsername, setSavingUsername] = useState(false);
+  const [editingUsername, setEditingUsername] = useState(false);
+
+  useEffect(() => {
+    if (userId) getUsername(userId).then(setMyUsername);
+  }, [userId]);
+
+  async function handleSaveUsername() {
+    if (savingUsername) return;
+    setSavingUsername(true);
+    setUsernameError(null);
+    const result = await saveUsername(userId, usernameInput);
+    if (result.ok) {
+      setMyUsername(usernameInput.trim());
+      setUsernameInput('');
+      setEditingUsername(false);
+    } else {
+      setUsernameError(result.error ?? 'Try again.');
+    }
+    setSavingUsername(false);
+  }
 
   const [isPremium, setIsPremium] = useState(false);
   useEffect(() => {
@@ -82,7 +108,37 @@ export function ProfileScreen({ username }: ProfileScreenProps) {
           <Pressable onPress={handleChangeAvatar}>
             <Text style={styles.avatarHint}>Tap photo to change</Text>
           </Pressable>
-          <Text style={styles.username}>{username}</Text>
+          {myUsername && !editingUsername ? (
+            <Pressable onPress={() => { setUsernameInput(myUsername); setEditingUsername(true); }}>
+              <Text style={styles.username}>@{myUsername}</Text>
+              <Text style={styles.avatarHint}>Tap to edit</Text>
+            </Pressable>
+          ) : (
+            <View style={styles.usernameSetBox}>
+              {!myUsername && (
+                <Text style={styles.usernameSetLabel}>Pick a username</Text>
+              )}
+              <View style={styles.usernameRow}>
+                <TextInput
+                  value={usernameInput}
+                  onChangeText={setUsernameInput}
+                  placeholder="username"
+                  placeholderTextColor={colors.textTertiary}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  style={styles.usernameInput}
+                />
+                <Pressable
+                  onPress={handleSaveUsername}
+                  disabled={savingUsername}
+                  style={styles.usernameSaveButton}
+                >
+                  <Text style={styles.usernameSaveText}>{savingUsername ? '…' : 'Save'}</Text>
+                </Pressable>
+              </View>
+              {usernameError && <Text style={styles.usernameError}>{usernameError}</Text>}
+            </View>
+          )}
         </View>
 
         <View style={styles.heroCard}>
@@ -153,6 +209,41 @@ const styles = StyleSheet.create({
     ...typography.display,
     color: colors.white,
     fontSize: 36,
+  },
+  usernameSetBox: { alignItems: 'center', marginTop: spacing.sm, paddingHorizontal: spacing.lg },
+  usernameSetLabel: {
+    ...typography.body,
+    color: colors.textTertiary,
+    fontSize: 13,
+    marginBottom: spacing.sm,
+  },
+  usernameRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  usernameInput: {
+    minWidth: 160,
+    height: 42,
+    borderRadius: radius.md,
+    backgroundColor: colors.surfaceGlass,
+    borderWidth: 1,
+    borderColor: colors.border,
+    paddingHorizontal: spacing.md,
+    color: colors.textPrimary,
+    ...typography.body,
+    fontSize: 15,
+  },
+  usernameSaveButton: {
+    height: 42,
+    paddingHorizontal: spacing.lg,
+    borderRadius: radius.md,
+    backgroundColor: colors.violetCore,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  usernameSaveText: { ...typography.bodyMedium, color: colors.white, fontSize: 14 },
+  usernameError: {
+    ...typography.body,
+    color: colors.pass,
+    fontSize: 12,
+    marginTop: spacing.xs,
   },
   username: {
     ...typography.heading,
