@@ -61,6 +61,7 @@ export function AnimeDetailsScreen({
   const [healedAnime, setHealedAnime] = useState<typeof animeProp | null>(null);
   useEffect(() => {
     setHealedAnime(null);
+    if (!animeProp) return;
     if (!animeProp.posterUrl) {
       getAnimeByIdAsync(animeProp.id)
         .then((fresh) => {

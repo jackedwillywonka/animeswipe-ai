@@ -9,6 +9,7 @@ import { AIChatScreen } from '@/screens/AIChatScreen';
 import { colors, radius, spacing, typography } from '@/theme/tokens';
 import { useSwipeDeck } from '@/hooks/useSwipeDeck';
 import { useAppContext } from '@/state/AppContext';
+import { fetchFranchiseInfo } from '@/services/anilistService';
 import { useAiSession } from '@/state/AiSessionContext';
 import type { RootStackParamList } from '@/navigation/RootNavigator';
 
@@ -31,19 +32,40 @@ export function SwipeScreen() {
 
   const upcoming = deck.slice(1, 2);
 
+  // Swiping right on an anime means you want the whole thing - add every
+  // season of the franchise to Plan to Watch (they land together in the library).
+  const addWholeFranchise = React.useCallback(
+    async (animeId: string) => {
+      try {
+        const fr = await fetchFranchiseInfo(animeId);
+        if (fr?.seasons && fr.seasons.length > 1) {
+          for (const s of fr.seasons) {
+            await setStatus(s.id, 'plan_to_watch');
+          }
+          return;
+        }
+      } catch {
+        // fall through to single-season add
+      }
+      await setStatus(animeId, 'plan_to_watch');
+    },
+    [setStatus]
+  );
+
   const handleDecision = React.useCallback(
     (direction: 'left' | 'right') => {
       const current = deck[0];
       if (current) {
         if (direction === 'right') {
-          setStatus(current.id, 'plan_to_watch');
+          // Fire and forget - the deck advances immediately, seasons save in bg.
+          addWholeFranchise(current.id);
         } else {
           setStatus(current.id, 'dropped');
         }
       }
       swipe(direction);
     },
-    [deck, setStatus, swipe]
+    [deck, setStatus, swipe, addWholeFranchise]
   );
 
   function openDetails() {

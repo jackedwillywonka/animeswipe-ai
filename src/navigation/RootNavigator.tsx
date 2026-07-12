@@ -11,9 +11,10 @@ import { MainTabs } from './MainTabs';
 import { colors } from '@/theme/tokens';
 import { useAppContext } from '@/state/AppContext';
 import { useAiSession } from '@/state/AiSessionContext';
-import { getAnimeById } from '@/services/animeRepository';
+import { getAnimeById, getAnimeByIdAsync } from '@/services/animeRepository';
 import { scoreAnime, buildInitialWeights } from '@/services/recommendationEngine';
 import { explainFromMemory } from '@/services/aiConversation';
+import type { Anime } from '@/types';
 
 export type RootStackParamList = {
   Login: undefined;
@@ -94,7 +95,29 @@ export function RootNavigator({
               options={{ presentation: 'card', animation: 'slide_from_right' }}
             >
               {({ navigation, route }) => {
-                const anime = getAnimeById(route.params.animeId);
+                // Seasons opened from the franchise list may not be cached yet -
+                // fetch them instead of rendering a blank screen.
+                const [fetched, setFetched] = React.useState<Anime | undefined>(
+                  () => getAnimeById(route.params.animeId)
+                );
+                React.useEffect(() => {
+                  let cancelled = false;
+                  const cachedNow = getAnimeById(route.params.animeId);
+                  if (cachedNow) {
+                    setFetched(cachedNow);
+                    return;
+                  }
+                  getAnimeByIdAsync(route.params.animeId)
+                    .then((a) => {
+                      if (!cancelled) setFetched(a);
+                    })
+                    .catch(() => {});
+                  return () => {
+                    cancelled = true;
+                  };
+                }, [route.params.animeId]);
+
+                const anime = fetched;
                 if (!anime) return null;
                 const weights = buildInitialWeights(preferences);
                 const match = scoreAnime(anime, weights);
