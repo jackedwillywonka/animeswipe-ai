@@ -113,7 +113,7 @@ export async function startCheckout(userId: string): Promise<void> {
   if (!userId) return;
   try {
     const returnUrl =
-      Platform.OS === 'web' ? window.location.origin : 'https://animeswipe-ai.vercel.app';
+      Platform.OS === 'web' ? window.location.origin : 'https://animeswipeai.com';
     const res = await fetch(CHECKOUT_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -140,7 +140,7 @@ export async function openCustomerPortal(userId: string): Promise<void> {
   if (!userId) return;
   try {
     const returnUrl =
-      Platform.OS === 'web' ? window.location.origin : 'https://animeswipe-ai.vercel.app';
+      Platform.OS === 'web' ? window.location.origin : 'https://animeswipeai.com';
     const res = await fetch(PORTAL_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
