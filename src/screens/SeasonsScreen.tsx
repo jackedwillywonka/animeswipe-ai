@@ -9,7 +9,7 @@ interface SeasonsScreenProps {
   franchiseTitle: string;
   seasons: FranchiseSeason[];
   onBack: () => void;
-  onSelectSeason: (seasonId: string) => void;
+  onSelectSeason: (season: FranchiseSeason) => void;
 }
 
 export function SeasonsScreen({
@@ -59,7 +59,7 @@ export function SeasonsScreen({
             <Pressable
               key={s.id}
               style={styles.row}
-              onPress={() => onSelectSeason(s.id)}
+              onPress={() => onSelectSeason(s)}
             >
               <Image source={{ uri: s.posterUrl }} style={styles.poster} />
               <View style={styles.rowInfo}>

@@ -22,7 +22,7 @@ export type RootStackParamList = {
   Welcome: undefined;
   AIChat: undefined;
   Main: undefined;
-  Details: { animeId: string };
+  Details: { animeId: string; seed?: { id: string; title: string; posterUrl: string; episodes: number; year: number | null } };
   Seasons: { seasons: any[]; franchiseTitle: string };
   Filters: undefined;
 };
@@ -98,8 +98,28 @@ export function RootNavigator({
               {({ navigation, route }) => {
                 // Seasons opened from the franchise list may not be cached yet -
                 // fetch them instead of rendering a blank screen.
+                // Render instantly from what we already know (the seasons list
+                // gave us title/poster/episodes), then upgrade when the full
+                // fetch lands. No spinner, no blank screen, never trapped.
+                const seed = route.params.seed;
+                const seedAnime: Anime | undefined = seed
+                  ? ({
+                      id: seed.id,
+                      title: seed.title,
+                      posterUrl: seed.posterUrl,
+                      episodes: seed.episodes,
+                      releaseYear: seed.year ?? 0,
+                      rating: 0,
+                      genres: [],
+                      description: '',
+                      status: 'finished',
+                      studio: '',
+                      runtimeMinutes: 0,
+                    } as Anime)
+                  : undefined;
+
                 const [fetched, setFetched] = React.useState<Anime | undefined>(
-                  () => getAnimeById(route.params.animeId)
+                  () => getAnimeById(route.params.animeId) ?? seedAnime
                 );
                 React.useEffect(() => {
                   let cancelled = false;
@@ -108,11 +128,21 @@ export function RootNavigator({
                     setFetched(cachedNow);
                     return;
                   }
-                  getAnimeByIdAsync(route.params.animeId)
-                    .then((a) => {
-                      if (!cancelled) setFetched(a);
-                    })
-                    .catch(() => {});
+                  // Retry with backoff - a single failed fetch (usually an
+                  // AniList rate-limit) shouldn't leave the user stuck loading.
+                  const attempt = async (tries: number) => {
+                    for (let i = 0; i < tries; i++) {
+                      if (cancelled) return;
+                      const a = await getAnimeByIdAsync(route.params.animeId).catch(() => undefined);
+                      if (a) {
+                        if (!cancelled) setFetched(a);
+                        return;
+                      }
+                      // wait longer each time: 1s, 2s, 3s
+                      await new Promise((r) => setTimeout(r, 1000 * (i + 1)));
+                    }
+                  };
+                  attempt(3);
                   return () => {
                     cancelled = true;
                   };
@@ -173,8 +203,8 @@ export function RootNavigator({
                   franchiseTitle={route.params.franchiseTitle}
                   seasons={route.params.seasons}
                   onBack={() => navigation.goBack()}
-                  onSelectSeason={(seasonId) =>
-                    navigation.push('Details', { animeId: seasonId })
+                  onSelectSeason={(season) =>
+                    navigation.push('Details', { animeId: season.id, seed: season })
                   }
                 />
               )}
