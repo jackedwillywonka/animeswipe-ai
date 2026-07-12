@@ -248,17 +248,26 @@ export function AnimeDetailsScreen({
               style={styles.tiktokButton}
               onPress={async () => {
                 const q = encodeURIComponent(anime.title + ' edit');
-                // Search URL lands on video results (and hands off to the
-                // TikTok app on phones, which is where most users are).
-                const searchUrl = `https://www.tiktok.com/search?q=${q}`;
+                const tag = anime.title.toLowerCase().replace(/[^a-z0-9]/g, '') + 'edit';
+                const appScheme = `snssdk1233://search?keyword=${q}`;
+                const hashtagUrl = `https://www.tiktok.com/tag/${tag}`;
                 if (Platform.OS === 'web') {
-                  Linking.openURL(searchUrl);
+                  // Try the app's search scheme first (iOS Safari may honor it
+                  // on a direct user tap). If nothing happens in ~1.2s, the app
+                  // didn't open - fall back to the hashtag page.
+                  const started = Date.now();
+                  window.location.href = appScheme;
+                  setTimeout(() => {
+                    if (Date.now() - started < 2000 && !document.hidden) {
+                      window.location.href = hashtagUrl;
+                    }
+                  }, 1200);
                   return;
                 }
                 try {
-                  await Linking.openURL(`snssdk1233://search?keyword=${q}`);
+                  await Linking.openURL(appScheme);
                 } catch {
-                  Linking.openURL(searchUrl);
+                  Linking.openURL(hashtagUrl);
                 }
               }}
             >
@@ -271,15 +280,23 @@ export function AnimeDetailsScreen({
               style={styles.tiktokButton}
               onPress={async () => {
                 const q = encodeURIComponent(anime.title + ' anime review');
-                const searchUrl = `https://www.tiktok.com/search?q=${q}`;
+                const tag = anime.title.toLowerCase().replace(/[^a-z0-9]/g, '') + 'review';
+                const appScheme = `snssdk1233://search?keyword=${q}`;
+                const hashtagUrl = `https://www.tiktok.com/tag/${tag}`;
                 if (Platform.OS === 'web') {
-                  Linking.openURL(searchUrl);
+                  const started = Date.now();
+                  window.location.href = appScheme;
+                  setTimeout(() => {
+                    if (Date.now() - started < 2000 && !document.hidden) {
+                      window.location.href = hashtagUrl;
+                    }
+                  }, 1200);
                   return;
                 }
                 try {
-                  await Linking.openURL(`snssdk1233://search?keyword=${q}`);
+                  await Linking.openURL(appScheme);
                 } catch {
-                  Linking.openURL(searchUrl);
+                  Linking.openURL(hashtagUrl);
                 }
               }}
             >
