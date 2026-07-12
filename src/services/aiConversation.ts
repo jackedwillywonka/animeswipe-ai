@@ -290,15 +290,26 @@ export async function processUserMessage(
     if (brain.query) {
       console.warn('[ai] query spec:', JSON.stringify(brain.query));
       let queryResults = await fetchAnimeByQuery(brain.query, seenArrForQuery, 50).catch(() => []);
-      // If the filters were too tight (common with movies + niche combos),
-      // retry progressively looser rather than showing the user nothing.
-      if (queryResults.length === 0) {
-        const looser = { ...brain.query, maxPopularity: null };
-        queryResults = await fetchAnimeByQuery(looser, seenArrForQuery, 50).catch(() => []);
+      // Broaden progressively until the deck is properly full. Users should
+      // always get a rich deck for any answerable request.
+      const TARGET = 25;
+      if (queryResults.length < TARGET) {
+        // 1) Drop the tag AND-constraints (the biggest narrowing factor)
+        const l1 = { ...brain.query, tags: [] };
+        const r1 = await fetchAnimeByQuery(l1, seenArrForQuery, 50).catch(() => []);
+        if (r1.length > queryResults.length) queryResults = r1;
       }
-      if (queryResults.length === 0) {
-        const looser2 = { ...brain.query, maxPopularity: null, tags: [], minScore: null };
-        queryResults = await fetchAnimeByQuery(looser2, seenArrForQuery, 50).catch(() => []);
+      if (queryResults.length < TARGET) {
+        // 2) Also drop the popularity cap
+        const l2 = { ...brain.query, tags: [], maxPopularity: null };
+        const r2 = await fetchAnimeByQuery(l2, seenArrForQuery, 50).catch(() => []);
+        if (r2.length > queryResults.length) queryResults = r2;
+      }
+      if (queryResults.length < TARGET) {
+        // 3) Last resort: genres + sort only
+        const l3 = { ...brain.query, tags: [], maxPopularity: null, minScore: null };
+        const r3 = await fetchAnimeByQuery(l3, seenArrForQuery, 50).catch(() => []);
+        if (r3.length > queryResults.length) queryResults = r3;
       }
       for (const a of queryResults) {
         if (found.has(a.id) || memory.seenIds.has(a.id)) continue;

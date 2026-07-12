@@ -48,6 +48,8 @@ HOW TO BUILD THE QUERY:
 
 "titles": ALSO give up to 8 specific hand-picked standouts that fit - your personal expert picks. These blend with the query results. Prefer less obvious picks over the same famous few.
 
+HONEST LIMITS: AniList has NO "number of seasons" field - seasons are relationship chains, not searchable data. If the user asks for anime "with 4+ seasons" or similar, say plainly in your "reply" that you can't filter by season count, but you CAN filter by episode count - and offer that instead (e.g. "I can't search by season count, but I can find long-running series - want me to show anime with 100+ episodes?"). Still return a sensible query (e.g. minEpisodes via constraints) so they get useful results.
+
 Never suggest hentai/adult titles. Don't recommend titles the user says they've already seen.`;
 
 Deno.serve(async (req) => {

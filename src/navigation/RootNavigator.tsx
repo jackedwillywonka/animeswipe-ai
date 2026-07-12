@@ -1,5 +1,5 @@
 import React from 'react';
-import { ActivityIndicator, View as RNView } from 'react-native';
+import { ActivityIndicator, Text, View as RNView } from 'react-native';
 import { NavigationContainer, DarkTheme } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { LoginScreen } from '@/screens/LoginScreen';
@@ -124,8 +124,21 @@ export function RootNavigator({
                   // Show a loading state rather than a blank screen while the
                   // fetch completes (or retries after a rate-limit window).
                   return (
-                    <RNView style={{ flex: 1, backgroundColor: colors.background, justifyContent: 'center', alignItems: 'center' }}>
-                      <ActivityIndicator size="large" color={colors.violetLight} />
+                    <RNView style={{ flex: 1, backgroundColor: colors.background }}>
+                      <RNView style={{ paddingTop: 60, paddingHorizontal: 20 }}>
+                        <Text
+                          onPress={() => navigation.goBack()}
+                          style={{ color: colors.violetLight, fontSize: 17 }}
+                        >
+                          ‹ Back
+                        </Text>
+                      </RNView>
+                      <RNView style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+                        <ActivityIndicator size="large" color={colors.violetLight} />
+                        <Text style={{ color: colors.textSecondary, marginTop: 16 }}>
+                          Loading…
+                        </Text>
+                      </RNView>
                     </RNView>
                   );
                 }
