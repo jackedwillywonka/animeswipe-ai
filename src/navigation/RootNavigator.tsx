@@ -118,7 +118,10 @@ export function RootNavigator({
                 }, [route.params.animeId]);
 
                 const anime = fetched;
-                if (!anime) return null;
+                if (!anime) {
+                  console.warn('[details] no anime for id=', route.params.animeId);
+                  return null;
+                }
                 const weights = buildInitialWeights(preferences);
                 const match = scoreAnime(anime, weights);
                 match.aiExplanation = explainFromMemory(memory, anime);

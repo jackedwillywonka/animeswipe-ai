@@ -288,6 +288,7 @@ export async function processUserMessage(
 
     // (b) The QUERY pulls dozens of real matches from AniList's whole catalog.
     if (brain.query) {
+      console.warn('[ai] query spec:', JSON.stringify(brain.query));
       let queryResults = await fetchAnimeByQuery(brain.query, seenArrForQuery, 50).catch(() => []);
       // If the filters were too tight (common with movies + niche combos),
       // retry progressively looser rather than showing the user nothing.

@@ -53,21 +53,7 @@ export function SeasonsScreen({
           {seasons.length} season{seasons.length === 1 ? '' : 's'}
         </Text>
 
-        <Pressable
-          onPress={handleAddAll}
-          disabled={addingAll || addedAll}
-          style={[styles.addAllButton, (addingAll || addedAll) && styles.addAllDisabled]}
-        >
-          <Text style={styles.addAllText}>
-            {addedAll
-              ? '✓ All seasons added to Plan to Watch'
-              : addingAll
-              ? 'Adding…'
-              : `+ Add all ${seasons.length} seasons to Plan to Watch`}
-          </Text>
-        </Pressable>
-
-        {seasons.map((s) => {
+                {seasons.map((s) => {
           const status = statusById[s.id];
           return (
             <Pressable
