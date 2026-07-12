@@ -1,4 +1,5 @@
 import React from 'react';
+import { ActivityIndicator, View as RNView } from 'react-native';
 import { NavigationContainer, DarkTheme } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { LoginScreen } from '@/screens/LoginScreen';
@@ -120,7 +121,13 @@ export function RootNavigator({
                 const anime = fetched;
                 if (!anime) {
                   console.warn('[details] no anime for id=', route.params.animeId);
-                  return null;
+                  // Show a loading state rather than a blank screen while the
+                  // fetch completes (or retries after a rate-limit window).
+                  return (
+                    <RNView style={{ flex: 1, backgroundColor: colors.background, justifyContent: 'center', alignItems: 'center' }}>
+                      <ActivityIndicator size="large" color={colors.violetLight} />
+                    </RNView>
+                  );
                 }
                 const weights = buildInitialWeights(preferences);
                 const match = scoreAnime(anime, weights);

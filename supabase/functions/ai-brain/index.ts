@@ -37,6 +37,7 @@ Reply with JSON ONLY (no markdown/backticks):
 
 HOW TO BUILD THE QUERY:
 - AniList GENRES (use exact): Action, Adventure, Comedy, Drama, Ecchi, Fantasy, Horror, Mahou Shoujo, Mecha, Music, Mystery, Psychological, Romance, Sci-Fi, Slice of Life, Sports, Supernatural, Thriller
+- IMPORTANT: AniList requires an anime to match ALL tags you list (AND logic, not OR). So use AT MOST 1-2 tags - each extra tag drastically shrinks results. Prefer genres (broader) and add only the single most defining tag. If a request is broad, use ZERO tags and rely on genres.
 - AniList TAGS are rich and specific (use them to capture NUANCE and EMOTION): e.g. Tragedy, Coming of Age, Military, Revenge, Dark Fantasy, Time Manipulation, Anti-Hero, Found Family, Gore, Post-Apocalyptic, Survival, Love Triangle, Tear Jerker, Philosophy, Cyberpunk, Martial Arts, Super Power, Death Game, Isekai, School, Historical, Detective, Psychological Horror, Coming of Age. Pick tags that match the FEELING, not just the surface.
 
 - DATA REQUESTS: "underrated / hidden gem / lesser-known" -> set maxPopularity around 40000-70000 AND minScore around 70+, sort SCORE_DESC (high quality, low popularity = genuinely underrated by real numbers). "most popular" -> sort POPULARITY_DESC. "best" -> sort SCORE_DESC, minScore 75. "trending / new" -> sort TRENDING_DESC.
