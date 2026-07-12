@@ -2,7 +2,7 @@ import * as WebBrowser from 'expo-web-browser';
 import { Platform } from 'react-native';
 import { supabase } from './supabase';
 
-export const FREE_DAILY_AI_LIMIT = 3;
+export const FREE_DAILY_AI_LIMIT = 5;
 
 export interface AiQuotaResult {
   allowed: boolean;
