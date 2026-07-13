@@ -28,6 +28,7 @@ export function LoginScreen({ onLoginGoogle, onLoginApple, onLoginEmail }: Login
         <AuthButton label="Continue with Google" onPress={onLoginGoogle} variant="filled" />
         <AuthButton label="Continue with Email" onPress={onLoginEmail} variant="outline" />
         <Text style={styles.hint}>
+          <Text style={styles.hintNote}>NOTE: </Text>
           An in-app browser can sometimes block Google sign-in — use email, or open in Safari to continue with Google.
         </Text>
       </View>
@@ -122,11 +123,16 @@ const styles = StyleSheet.create({
   },
   hint: {
     ...typography.caption,
-    color: colors.textTertiary,
+    color: colors.textPrimary,
     fontSize: 12,
     textAlign: 'center',
     marginTop: spacing.sm,
     lineHeight: 17,
+  },
+  hintNote: {
+    ...typography.bodyMedium,
+    color: colors.pass,
+    fontSize: 12,
   },
   legal: {
     ...typography.caption,
