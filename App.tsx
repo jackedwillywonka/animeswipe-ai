@@ -12,7 +12,6 @@ import { SplashScreen } from '@/screens/SplashScreen';
 import { EmailAuthScreen } from '@/screens/EmailAuthScreen';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { Analytics } from '@vercel/analytics/react';
-import { Platform } from 'react-native';
 import { RootNavigator } from '@/navigation/RootNavigator';
 import { AppProvider } from '@/state/AppContext';
 import { AiSessionProvider } from '@/state/AiSessionContext';
