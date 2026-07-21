@@ -10,6 +10,8 @@ import { useFonts as useInter, Inter_400Regular, Inter_500Medium } from '@expo-g
 import type { Session } from '@supabase/supabase-js';
 import { SplashScreen } from '@/screens/SplashScreen';
 import { EmailAuthScreen } from '@/screens/EmailAuthScreen';
+import { ChooseUsernameScreen } from '@/screens/ChooseUsernameScreen';
+import { getUsername } from '@/services/usernameService';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { Analytics } from '@vercel/analytics/react';
 import { RootNavigator } from '@/navigation/RootNavigator';
@@ -28,6 +30,23 @@ function AppInner() {
   const [session, setSession] = useState<Session | null>(null);
   const [authChecked, setAuthChecked] = useState(false);
   const [emailAuthOpen, setEmailAuthOpen] = useState(false);
+  const [needsUsername, setNeedsUsername] = useState<boolean | null>(null);
+
+  // After login, check whether this user has picked a username yet.
+  useEffect(() => {
+    const uid = session?.user?.id;
+    if (!uid) {
+      setNeedsUsername(null);
+      return;
+    }
+    let cancelled = false;
+    getUsername(uid).then((u) => {
+      if (!cancelled) setNeedsUsername(!u);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [session?.user?.id]);
 
   // On launch: restore any saved session, then listen for login/logout.
   useEffect(() => {
@@ -49,6 +68,17 @@ function AppInner() {
         <EmailAuthScreen
           onBack={() => setEmailAuthOpen(false)}
           onAuthenticated={() => setEmailAuthOpen(false)}
+        />
+      </SafeAreaProvider>
+    );
+  }
+
+  if (session && needsUsername) {
+    return (
+      <SafeAreaProvider>
+        <ChooseUsernameScreen
+          userId={session.user.id}
+          onDone={() => setNeedsUsername(false)}
         />
       </SafeAreaProvider>
     );
